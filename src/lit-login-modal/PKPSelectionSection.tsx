@@ -869,7 +869,7 @@ const PKPSelectionSection: React.FC<PKPSelectionSectionProps> = ({
                               Fund
                             </button>
                             <a
-                              href={`${APP_INFO.faucetUrl}?action=ledger&address=${pkp.ethAddress}&network=${currentNetworkName}`}
+                              href={`${APP_INFO.faucetUrl}?action=combined&ledgerPercent=80&address=${pkp.ethAddress}&network=${currentNetworkName}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}

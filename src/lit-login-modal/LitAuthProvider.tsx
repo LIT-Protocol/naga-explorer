@@ -36,7 +36,7 @@ const NETWORK_MODULES: Partial<Record<SupportedNetworkName, any>> = {
 
 // Configuration constants
 const DEFAULT_PRIVATE_KEY = APP_INFO.defaultPrivateKey;
-const FAUCET_URL = `${APP_INFO.faucetUrl}?action=ledger`;
+const FAUCET_URL = `${APP_INFO.faucetUrl}?action=combined&ledgerPercent=80`;
 const DEFAULT_LOGIN_SERVICE_BASE_URL = APP_INFO.litLoginServer;
 const DEFAULT_DISCORD_CLIENT_ID = APP_INFO.discordClientId;
 const DEFAULT_AUTH_SERVICE_URLS = APP_INFO.authServiceUrls;

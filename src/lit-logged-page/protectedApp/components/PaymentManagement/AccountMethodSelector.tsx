@@ -258,7 +258,7 @@ export default function AccountMethodSelector({
             Make sure your wallet is connected and you have test tokens. Need
             tokens? Visit the{" "}
             <a
-              href={`${APP_INFO.faucetUrl}?action=ledger`}
+              href={`${APP_INFO.faucetUrl}?action=combined&ledgerPercent=80`}
               target="_blank"
               rel="noopener noreferrer"
               style={{ color: "#4285F4", textDecoration: "underline" }}
