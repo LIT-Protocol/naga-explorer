@@ -41,6 +41,7 @@ export const APP_INFO = {
   faucetUrl: "https://chronicle-yellowstone-faucet.getlit.dev/naga",
   defaultPrivateKey:
     "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+  nagaLitActionsDocs: "https://naga.actions-docs.litprotocol.com",
 } as const;
 
 // Blockchain Network Configuration

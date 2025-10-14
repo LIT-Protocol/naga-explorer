@@ -26,6 +26,7 @@ import copyIcon from "../assets/copy.svg";
 import { getAddress } from "viem";
 import { formatPublicKey } from "./protectedApp/utils";
 import { PKPData } from "@lit-protocol/schemas";
+import { APP_INFO } from "@/_config";
 
 enum LOGIN_STYLE {
   button = "button",
@@ -423,7 +424,7 @@ export default function LoggedInDashboard() {
                 <a
                   className="group flex items-center pr-3 py-2 cursor-pointer focus:outline-primary dark:focus:outline-primary-light gap-x-3 rounded-xl hover:bg-gray-600/5 hover:text-black"
                   style={{ paddingLeft: "1rem", marginLeft: "-1rem" }}
-                  href="https://actions-docs.litprotocol.com/"
+                  href={APP_INFO.nagaLitActionsDocs}
                   target="_blank"
                   rel="noopener noreferrer"
                 >

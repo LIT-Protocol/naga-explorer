@@ -1,6 +1,7 @@
 import React from "react";
 import { UIPKP, BalanceInfo } from "../../types";
 import { PKPInfoCard } from "../pkp/PKPInfoCard";
+import { APP_INFO } from "@/_config";
 
 interface DashboardContentProps {
   selectedPkp: UIPKP | null;
@@ -104,7 +105,7 @@ export const DashboardContent: React.FC<DashboardContentProps> = ({
               <a
                 className="group flex items-center pr-3 py-2 cursor-pointer focus:outline-primary dark:focus:outline-primary-light gap-x-3 rounded-xl hover:bg-gray-600/5 hover:text-black"
                 style={{ paddingLeft: "1rem", marginLeft: "-1rem" }}
-                href="https://actions-docs.litprotocol.com/"
+                href={APP_INFO.nagaLitActionsDocs}
                 target="_blank"
                 rel="noopener noreferrer"
               >
