@@ -44,8 +44,26 @@ const DEFAULT_EXAMPLE = getDefaultLitActionExample();
 const DEFAULT_EXAMPLE_ID = DEFAULT_EXAMPLE?.id ?? null;
 const DEFAULT_EXAMPLE_CODE = DEFAULT_EXAMPLE?.code ?? "";
 const DEFAULT_JS_PARAMS_INPUT = formatJsParams(DEFAULT_EXAMPLE?.jsParams);
+const CUSTOM_SHARE_EXAMPLE_ID = "custom-share";
 
 const LIT_ACTION_TYPES_URI = "ts:lit-actions.d.ts";
+
+const encodeForShare = (value: string) => {
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(value);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return encodeURIComponent(btoa(binary));
+};
+
+const decodeFromShare = (value: string) => {
+  const binary = atob(decodeURIComponent(value));
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  const decoder = new TextDecoder();
+  return decoder.decode(bytes);
+};
 
 interface LitActionFormProps {
   selectedPkp: UIPKP | null;
@@ -76,6 +94,8 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
   const [isExecutingAction, setIsExecutingAction] = useState(false);
   const [status, setStatus] = useState<string>("");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [hasSharedLink, setHasSharedLink] = useState(false);
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const editorRef = useRef<any>(null);
   const paramsEditorRef = useRef<any>(null);
@@ -86,11 +106,48 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
   const [showShortcutTip, setShowShortcutTip] = useState(false);
   const [showParsedModal, setShowParsedModal] = useState(false);
 
-  const selectedExample = useMemo(
-    () =>
-      selectedExampleId ? getLitActionExample(selectedExampleId) : undefined,
-    [selectedExampleId]
-  );
+  const selectedExample = useMemo(() => {
+    if (selectedExampleId === CUSTOM_SHARE_EXAMPLE_ID) {
+      return {
+        id: CUSTOM_SHARE_EXAMPLE_ID,
+        title: "Shared Link",
+        description: "Loaded from shared URL parameters.",
+        code: litActionCode,
+        jsParams: (() => {
+          try {
+            return JSON.parse(jsParamsInput);
+          } catch {
+            return undefined;
+          }
+        })(),
+      };
+    }
+    return selectedExampleId
+      ? getLitActionExample(selectedExampleId)
+      : undefined;
+  }, [jsParamsInput, litActionCode, selectedExampleId]);
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const encodedCode = params.get("code");
+      const encodedParams = params.get("params");
+      if (encodedCode || encodedParams) {
+        if (encodedCode) {
+          const decodedCode = decodeFromShare(encodedCode);
+          setLitActionCode(decodedCode);
+        }
+        if (encodedParams) {
+          const decodedParams = decodeFromShare(encodedParams);
+          setJsParamsInput(decodedParams);
+        }
+        setSelectedExampleId(CUSTOM_SHARE_EXAMPLE_ID);
+        setHasSharedLink(true);
+      }
+    } catch (error) {
+      console.error("Failed to decode shared Lit Action state", error);
+    }
+  }, []);
 
   const parsedResponse = useMemo(() => {
     const rawResponse = litActionResult?.result?.response;
@@ -121,9 +178,7 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
   }, [litActionResult]);
 
   const tryParseJson = useCallback(
-    (
-      text: string
-    ): Record<string, unknown> | unknown[] | null => {
+    (text: string): Record<string, unknown> | unknown[] | null => {
       try {
         const parsed = JSON.parse(text);
         if (parsed && typeof parsed === "object") {
@@ -137,27 +192,33 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
     []
   );
 
-  const copyToClipboard = useCallback(async (pathKey: string, value: string) => {
-    try {
-      if (typeof navigator !== "undefined" && navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(value);
-      } else if (typeof document !== "undefined") {
-        const textarea = document.createElement("textarea");
-        textarea.value = value;
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textarea);
-      } else {
-        return;
+  const copyToClipboard = useCallback(
+    async (pathKey: string, value: string) => {
+      try {
+        if (
+          typeof navigator !== "undefined" &&
+          navigator?.clipboard?.writeText
+        ) {
+          await navigator.clipboard.writeText(value);
+        } else if (typeof document !== "undefined") {
+          const textarea = document.createElement("textarea");
+          textarea.value = value;
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textarea);
+        } else {
+          return;
+        }
+        setCopiedField(pathKey);
+      } catch (error) {
+        console.error("Failed to copy field", error);
       }
-      setCopiedField(pathKey);
-    } catch (error) {
-      console.error("Failed to copy field", error);
-    }
-  }, []);
+    },
+    []
+  );
 
   const executeButtonDisabled =
     disabled || isExecutingAction || !litActionCode.trim();
@@ -657,27 +718,27 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
                   </pre>
                 )}
               </div>
-            <button
-              onClick={() => copyToClipboard(pathKey, copyPayload)}
-              style={{
-                padding: "4px 8px",
-                borderRadius: "6px",
-                border: "1px solid rgba(209, 213, 219, 0.6)",
-                backgroundColor: fullscreen
-                  ? "rgba(17, 24, 39, 0.6)"
-                  : "#ffffff",
-                color: fullscreen ? "#f9fafb" : "#1f2937",
-                fontSize: "10px",
-                cursor: "pointer",
-              }}
-            >
-              {copiedField === pathKey ? "Copied" : "Copy"}
-            </button>
-          </div>
-        );
-      })}
-    </div>
-  );
+              <button
+                onClick={() => copyToClipboard(pathKey, copyPayload)}
+                style={{
+                  padding: "4px 8px",
+                  borderRadius: "6px",
+                  border: "1px solid rgba(209, 213, 219, 0.6)",
+                  backgroundColor: fullscreen
+                    ? "rgba(17, 24, 39, 0.6)"
+                    : "#ffffff",
+                  color: fullscreen ? "#f9fafb" : "#1f2937",
+                  fontSize: "10px",
+                  cursor: "pointer",
+                }}
+              >
+                {copiedField === pathKey ? "Copied" : "Copy"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   const renderResultPanel = (fullscreen: boolean) => {
@@ -830,6 +891,12 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
   }, [copiedField]);
 
   useEffect(() => {
+    if (!shareStatus) return;
+    const timeout = window.setTimeout(() => setShareStatus(null), 2000);
+    return () => window.clearTimeout(timeout);
+  }, [shareStatus]);
+
+  useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (showParsedModal) {
@@ -925,6 +992,30 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
   };
 
   const loadExample = useCallback((exampleId: string) => {
+    if (exampleId === CUSTOM_SHARE_EXAMPLE_ID) {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const encodedCode = params.get("code");
+        const encodedParams = params.get("params");
+        if (encodedCode) {
+          const decodedCode = decodeFromShare(encodedCode);
+          setLitActionCode(decodedCode);
+        }
+        if (encodedParams) {
+          const decodedParams = decodeFromShare(encodedParams);
+          setJsParamsInput(decodedParams);
+        }
+        setJsParamsError(null);
+        setStatus("Loaded shared Lit Action");
+        setShowParsedModal(false);
+        setSelectedExampleId(CUSTOM_SHARE_EXAMPLE_ID);
+      } catch (error) {
+        console.error("Failed to load shared example", error);
+        setStatus("Unable to load shared Lit Action");
+      }
+      return;
+    }
+
     const example = getLitActionExample(exampleId);
     if (!example) {
       console.warn(`[LitActionForm] Unknown Lit Action example: ${exampleId}`);
@@ -940,6 +1031,30 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
     setStatus("");
     setShowParsedModal(false);
   }, []);
+
+  const handleShare = useCallback(async () => {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("code", encodeForShare(litActionCode));
+      url.searchParams.set("params", encodeForShare(jsParamsInput));
+      const shareUrl = url.toString();
+
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        setShareStatus("Share link copied!");
+      } else {
+        window.prompt("Copy this Lit Action link", shareUrl);
+        setShareStatus("Share link ready to copy");
+      }
+
+      window.history.replaceState({}, "", shareUrl);
+      setHasSharedLink(true);
+      setSelectedExampleId(CUSTOM_SHARE_EXAMPLE_ID);
+    } catch (error) {
+      console.error("Failed to generate share link", error);
+      setShareStatus("Unable to copy share link");
+    }
+  }, [jsParamsInput, litActionCode]);
 
   return (
     <div
@@ -1046,6 +1161,9 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
                   minWidth: "220px",
                 }}
               >
+                {hasSharedLink && (
+                  <option value={CUSTOM_SHARE_EXAMPLE_ID}>Shared Link</option>
+                )}
                 {litActionExamples.map((example) => (
                   <option key={example.id} value={example.id}>
                     {example.title}
@@ -1093,6 +1211,31 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
                 </span>
               )}
             </button>
+            <button
+              onClick={handleShare}
+              style={{
+                padding: "8px 14px",
+                borderRadius: "8px",
+                border: "1px solid #1f2937",
+                backgroundColor: "#111827",
+                color: "#f9fafb",
+                fontSize: "12px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Share Link
+            </button>
+            {shareStatus && (
+              <span
+                style={{
+                  fontSize: "11px",
+                  color: shareStatus.includes("Unable") ? "#fecaca" : "#bbf7d0",
+                }}
+              >
+                {shareStatus}
+              </span>
+            )}
           </div>
         ) : (
           <div
@@ -1102,6 +1245,33 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
               flexWrap: "wrap",
             }}
           >
+            {hasSharedLink && (
+              <button
+                key={CUSTOM_SHARE_EXAMPLE_ID}
+                onClick={() => loadExample(CUSTOM_SHARE_EXAMPLE_ID)}
+                disabled={disabled || isExecutingAction}
+                title="Loaded from shared URL"
+                style={{
+                  padding: "4px 8px",
+                  backgroundColor:
+                    selectedExampleId === CUSTOM_SHARE_EXAMPLE_ID
+                      ? "#0ea5e9"
+                      : "#f3f4f6",
+                  color:
+                    selectedExampleId === CUSTOM_SHARE_EXAMPLE_ID
+                      ? "#ffffff"
+                      : "#374151",
+                  border: "none",
+                  borderRadius: "4px",
+                  fontSize: "11px",
+                  cursor:
+                    disabled || isExecutingAction ? "not-allowed" : "pointer",
+                  transition: "background-color 0.15s ease",
+                }}
+              >
+                Shared Link
+              </button>
+            )}
             {litActionExamples.map((example) => {
               const isActive = example.id === selectedExampleId;
               const isDisabled = disabled || isExecutingAction;
@@ -1164,18 +1334,60 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
         <>
           {renderCompactLayout()}
 
-          <button
-            onClick={executeLitAction}
-            disabled={executeButtonDisabled}
-            className={`w-full p-3 rounded-lg text-sm font-medium flex items-center justify-center gap-2 border-1 border-gray-200 ${
-              executeButtonDisabled
-                ? "bg-gray-400 cursor-not-allowed text-white"
-                : "bg-[#B7410D] text-white cursor-pointer"
-            }`}
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              flexWrap: "wrap",
+              marginBottom: "12px",
+            }}
           >
-            {executeButtonContent}
-          </button>
-
+            <button
+              onClick={executeLitAction}
+              disabled={executeButtonDisabled}
+              style={{
+                padding: "10px 18px",
+                borderRadius: "8px",
+                border: "1px solid #d1d5db",
+                backgroundColor: executeButtonDisabled ? "#9ca3af" : "#B7410D",
+                color: "#ffffff",
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: executeButtonDisabled ? "not-allowed" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              {executeButtonContent}
+            </button>
+            <button
+              onClick={handleShare}
+              style={{
+                padding: "10px 16px",
+                borderRadius: "8px",
+                border: "1px solid #d1d5db",
+                backgroundColor: "#f3f4f6",
+                color: "#1f2937",
+                fontSize: "12px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Share Link
+            </button>
+            {shareStatus && (
+              <span
+                style={{
+                  fontSize: "11px",
+                  color: shareStatus.includes("Unable") ? "#dc2626" : "#15803d",
+                  alignSelf: "center",
+                }}
+              >
+                {shareStatus}
+              </span>
+            )}
+          </div>
 
           <div style={{ marginTop: "16px" }}>{renderResultPanel(false)}</div>
         </>
@@ -1228,7 +1440,9 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
               >
                 Parsable JSON
               </h3>
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <div
+                style={{ display: "flex", gap: "8px", alignItems: "center" }}
+              >
                 <button
                   onClick={executeLitAction}
                   disabled={executeButtonDisabled}
@@ -1276,7 +1490,6 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
           </div>
         </div>
       )}
-
     </div>
   );
 };
