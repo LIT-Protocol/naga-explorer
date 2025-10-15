@@ -29,7 +29,7 @@ const code = String.raw`(async () => {
     const entropy = ethers.utils.arrayify(entropyHex);
     results.step2_generateEntropy = {
       success: true,
-      entropyPreview: entropyHex.substring(0, 20) + "...",
+      entropy: entropyHex,
       entropyLength: entropy.length,
     };
 
@@ -85,7 +85,7 @@ const code = String.raw`(async () => {
     results.step3_encrypt = {
       success: true,
       ciphertextLength: ciphertextStr.length,
-      ciphertextPreview: ciphertextStr.substring(0, 30) + "...",
+      ciphertext: ciphertextStr,
       dataToEncryptHash: dataHashStr,
     };
 
@@ -112,7 +112,7 @@ const code = String.raw`(async () => {
 
     results.step4_decrypt = {
       success: true,
-      decryptedDataPreview: decryptedHex.substring(0, 20) + "...",
+      decryptedData: decryptedHex,
       decryptedLength: decryptResult.length,
     };
 
@@ -121,8 +121,8 @@ const code = String.raw`(async () => {
     results.step5_verify = {
       success: true,
       matches,
-      originalPreview: entropyHex.substring(0, 20) + "...",
-      decryptedPreview: decryptedHex.substring(0, 20) + "...",
+      original: entropyHex,
+      decrypted: decryptedHex,
     };
 
     Lit.Actions.setResponse({

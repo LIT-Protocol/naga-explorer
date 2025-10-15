@@ -585,9 +585,17 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
             : val && typeof val === "object"
             ? (val as Record<string, unknown>)
             : null;
-          const copyPayload = nestedValue
-            ? JSON.stringify(nestedValue, null, 2)
-            : formatPrimitive(val);
+          const copyPayload = (() => {
+            if (typeof val === "string") return val;
+            if (nestedValue) {
+              try {
+                return JSON.stringify(nestedValue, null, 2);
+              } catch {
+                return String(nestedValue);
+              }
+            }
+            return formatPrimitive(val);
+          })();
           return (
             <div
               key={pathKey}
@@ -649,25 +657,27 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
                   </pre>
                 )}
               </div>
-              <button
-                onClick={() => copyToClipboard(pathKey, copyPayload)}
-                style={{
-                  padding: "4px 8px",
-                  borderRadius: "6px",
-                  border: "1px solid rgba(209, 213, 219, 0.6)",
-                  backgroundColor: fullscreen ? "rgba(17, 24, 39, 0.6)" : "#ffffff",
-                  color: fullscreen ? "#f9fafb" : "#1f2937",
-                  fontSize: "10px",
-                  cursor: "pointer",
-                }}
-              >
-                {copiedField === pathKey ? "Copied" : "Copy"}
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    );
+            <button
+              onClick={() => copyToClipboard(pathKey, copyPayload)}
+              style={{
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid rgba(209, 213, 219, 0.6)",
+                backgroundColor: fullscreen
+                  ? "rgba(17, 24, 39, 0.6)"
+                  : "#ffffff",
+                color: fullscreen ? "#f9fafb" : "#1f2937",
+                fontSize: "10px",
+                cursor: "pointer",
+              }}
+            >
+              {copiedField === pathKey ? "Copied" : "Copy"}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
   };
 
   const renderResultPanel = (fullscreen: boolean) => {
@@ -808,10 +818,8 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
   }, []);
 
   useEffect(() => {
-    if (parsedResponse) {
-      setActiveResultTab("parsable");
-    } else {
-      setActiveResultTab("raw");
+    if (!parsedResponse) {
+      setShowParsedModal(false);
     }
   }, [parsedResponse, litActionResult?.timestamp]);
 
@@ -823,13 +831,17 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsFullscreen(false);
+      if (e.key !== "Escape") return;
+      if (showParsedModal) {
+        setShowParsedModal(false);
+        e.stopPropagation();
+        return;
       }
+      setIsFullscreen(false);
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [showParsedModal]);
 
   // Show the shortcut tip when entering fullscreen; hide when exiting
   useEffect(() => {
@@ -926,7 +938,7 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
     setJsParamsInput(formattedParams);
     setJsParamsError(null);
     setStatus("");
-    setActiveResultTab("raw");
+    setShowParsedModal(false);
   }, []);
 
   return (
@@ -1185,7 +1197,7 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
         >
           <div
             style={{
-              width: "min(900px, 90vw)",
+              width: "min(1300px, 90vw)",
               maxHeight: "80vh",
               backgroundColor: "#0f172a",
               border: "1px solid #1f2937",
@@ -1216,18 +1228,41 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
               >
                 Parsable JSON
               </h3>
-              <button
-                onClick={() => setShowParsedModal(false)}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  color: "#e5e7eb",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                }}
-              >
-                Close
-              </button>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <button
+                  onClick={executeLitAction}
+                  disabled={executeButtonDisabled}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(209,213,219,0.4)",
+                    backgroundColor: executeButtonDisabled
+                      ? "rgba(156,163,175,0.4)"
+                      : "#B7410D",
+                    color: "#ffffff",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    cursor: executeButtonDisabled ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  {executeButtonContent}
+                </button>
+                <button
+                  onClick={() => setShowParsedModal(false)}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "#e5e7eb",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                  }}
+                >
+                  Close
+                </button>
+              </div>
             </div>
             <div
               style={{
@@ -1241,6 +1276,7 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
           </div>
         </div>
       )}
+
     </div>
   );
 };
