@@ -45,6 +45,9 @@ const DEFAULT_EXAMPLE_ID = DEFAULT_EXAMPLE?.id ?? null;
 const DEFAULT_EXAMPLE_CODE = DEFAULT_EXAMPLE?.code ?? "";
 const DEFAULT_JS_PARAMS_INPUT = formatJsParams(DEFAULT_EXAMPLE?.jsParams);
 const CUSTOM_SHARE_EXAMPLE_ID = "custom-share";
+const CUSTOM_LOCAL_PREFIX = "custom-local";
+const LOCAL_STORAGE_KEY = "litExplorer.customExamples.v1";
+const BLANK_EXAMPLE_ID = "blank";
 
 const LIT_ACTION_TYPES_URI = "ts:lit-actions.d.ts";
 
@@ -96,6 +99,9 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasSharedLink, setHasSharedLink] = useState(false);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
+  const [localExamples, setLocalExamples] = useState<
+    { id: string; title: string; code: string; params: string }[]
+  >([]);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const editorRef = useRef<any>(null);
   const paramsEditorRef = useRef<any>(null);
@@ -107,10 +113,36 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
   const [showParsedModal, setShowParsedModal] = useState(false);
 
   const selectedExample = useMemo(() => {
+    if (selectedExampleId === BLANK_EXAMPLE_ID) {
+      return {
+        id: BLANK_EXAMPLE_ID,
+        title: "New Blank Action",
+        description: "Start from scratch with an empty editor.",
+        code: litActionCode,
+      };
+    }
+    const localExample = localExamples.find(
+      (example) => example.id === selectedExampleId
+    );
+    if (localExample) {
+      return {
+        id: localExample.id,
+        title: localExample.title,
+        description: "Custom action saved locally.",
+        code: localExample.code,
+        jsParams: (() => {
+          try {
+            return JSON.parse(localExample.params);
+          } catch {
+            return undefined;
+          }
+        })(),
+      };
+    }
     if (selectedExampleId === CUSTOM_SHARE_EXAMPLE_ID) {
       return {
         id: CUSTOM_SHARE_EXAMPLE_ID,
-        title: "Shared Link",
+        title: "Shared Code",
         description: "Loaded from shared URL parameters.",
         code: litActionCode,
         jsParams: (() => {
@@ -125,9 +157,24 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
     return selectedExampleId
       ? getLitActionExample(selectedExampleId)
       : undefined;
-  }, [jsParamsInput, litActionCode, selectedExampleId]);
+  }, [jsParamsInput, litActionCode, selectedExampleId, localExamples]);
 
   useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as {
+          id: string;
+          title: string;
+          code: string;
+          params: string;
+        }[];
+        setLocalExamples(parsed);
+      }
+    } catch (error) {
+      console.error("Failed to load local Lit Action examples", error);
+    }
+
     try {
       const params = new URLSearchParams(window.location.search);
       const encodedCode = params.get("code");
@@ -176,6 +223,50 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
       return String(litActionResult.result);
     }
   }, [litActionResult]);
+
+  const saveLocalExample = useCallback(() => {
+    const baseTitle = "Custom Action";
+    let suffix = 1;
+    let title = baseTitle;
+    const existingTitles = new Set(localExamples.map((ex) => ex.title));
+    while (existingTitles.has(title)) {
+      suffix += 1;
+      title = `${baseTitle} ${suffix}`;
+    }
+
+    const id = `${CUSTOM_LOCAL_PREFIX}-${Date.now()}`;
+    const record = {
+      id,
+      title,
+      code: litActionCode,
+      params: jsParamsInput,
+    };
+    const nextExamples = [record, ...localExamples];
+    setLocalExamples(nextExamples);
+    window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(nextExamples));
+    setSelectedExampleId(id);
+    setStatus(`Saved ${title}`);
+  }, [jsParamsInput, litActionCode, localExamples]);
+
+  const deleteLocalExample = useCallback(() => {
+    if (!selectedExampleId?.startsWith(CUSTOM_LOCAL_PREFIX)) return;
+    const nextExamples = localExamples.filter(
+      (example) => example.id !== selectedExampleId
+    );
+    setLocalExamples(nextExamples);
+    window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(nextExamples));
+    setSelectedExampleId(nextExamples[0]?.id ?? DEFAULT_EXAMPLE_ID);
+    setStatus("Removed local Lit Action");
+  }, [localExamples, selectedExampleId]);
+
+  const createBlankExample = useCallback(() => {
+    setLitActionCode("");
+    setJsParamsInput("{}");
+    setJsParamsError(null);
+    setSelectedExampleId(BLANK_EXAMPLE_ID);
+    setStatus("Ready for new Lit Action");
+    setShowParsedModal(false);
+  }, []);
 
   const tryParseJson = useCallback(
     (text: string): Record<string, unknown> | unknown[] | null => {
@@ -992,6 +1083,10 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
   };
 
   const loadExample = useCallback((exampleId: string) => {
+    if (!exampleId || exampleId === BLANK_EXAMPLE_ID) {
+      createBlankExample();
+      return;
+    }
     if (exampleId === CUSTOM_SHARE_EXAMPLE_ID) {
       try {
         const params = new URLSearchParams(window.location.search);
@@ -1016,6 +1111,18 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
       return;
     }
 
+    if (exampleId.startsWith(CUSTOM_LOCAL_PREFIX)) {
+      const example = localExamples.find((ex) => ex.id === exampleId);
+      if (example) {
+        setLitActionCode(example.code);
+        setJsParamsInput(example.params);
+        setJsParamsError(null);
+        setSelectedExampleId(example.id);
+        setStatus("Loaded local Lit Action");
+      }
+      return;
+    }
+
     const example = getLitActionExample(exampleId);
     if (!example) {
       console.warn(`[LitActionForm] Unknown Lit Action example: ${exampleId}`);
@@ -1030,7 +1137,7 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
     setJsParamsError(null);
     setStatus("");
     setShowParsedModal(false);
-  }, []);
+  }, [createBlankExample, localExamples]);
 
   const handleShare = useCallback(async () => {
     try {
@@ -1161,9 +1268,15 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
                   minWidth: "220px",
                 }}
               >
+                <option value={BLANK_EXAMPLE_ID}>New Blank Action</option>
                 {hasSharedLink && (
-                  <option value={CUSTOM_SHARE_EXAMPLE_ID}>Shared Link</option>
+                  <option value={CUSTOM_SHARE_EXAMPLE_ID}>Shared Code</option>
                 )}
+                {localExamples.map((example) => (
+                  <option key={example.id} value={example.id}>
+                    {example.title} (Local)
+                  </option>
+                ))}
                 {litActionExamples.map((example) => (
                   <option key={example.id} value={example.id}>
                     {example.title}
@@ -1216,6 +1329,21 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
               style={{
                 padding: "8px 14px",
                 borderRadius: "8px",
+                border: "1px solid #d1d5db",
+                backgroundColor: "#f3f4f6",
+                color: "#1f2937",
+                fontSize: "12px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Share Link
+            </button>
+            <button
+              onClick={saveLocalExample}
+              style={{
+                padding: "8px 14px",
+                borderRadius: "8px",
                 border: "1px solid #1f2937",
                 backgroundColor: "#111827",
                 color: "#f9fafb",
@@ -1224,8 +1352,40 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
                 cursor: "pointer",
               }}
             >
-              Share Link
+              Save
             </button>
+            {selectedExampleId?.startsWith(CUSTOM_LOCAL_PREFIX) && (
+              <button
+                onClick={deleteLocalExample}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: "8px",
+                  border: "1px solid #dc2626",
+                  backgroundColor: "#fee2e2",
+                  color: "#991b1b",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Delete
+              </button>
+            )}
+            {/* <button
+              onClick={createBlankExample}
+              style={{
+                padding: "8px 14px",
+                borderRadius: "8px",
+                border: "1px solid #4b5563",
+                backgroundColor: "#f9fafb",
+                color: "#1f2937",
+                fontSize: "12px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              New Code
+            </button> */}
             {shareStatus && (
               <span
                 style={{
@@ -1238,70 +1398,60 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
             )}
           </div>
         ) : (
-          <div
-            style={{
-              display: "flex",
-              gap: "8px",
-              flexWrap: "wrap",
-            }}
-          >
-            {hasSharedLink && (
-              <button
-                key={CUSTOM_SHARE_EXAMPLE_ID}
-                onClick={() => loadExample(CUSTOM_SHARE_EXAMPLE_ID)}
-                disabled={disabled || isExecutingAction}
-                title="Loaded from shared URL"
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <select
+              value={selectedExampleId ?? ""}
+              onChange={(event) => loadExample(event.target.value)}
+              disabled={disabled || isExecutingAction}
+              style={{
+                padding: "6px 10px",
+                borderRadius: "6px",
+                border: "1px solid #d1d5db",
+                backgroundColor: "#ffffff",
+                fontSize: "12px",
+                minWidth: "220px",
+              }}
+            >
+              <option value={BLANK_EXAMPLE_ID}>New Blank Action</option>
+              {hasSharedLink && (
+                <option value={CUSTOM_SHARE_EXAMPLE_ID}>Shared Code</option>
+              )}
+              {localExamples.map((example) => (
+                <option key={example.id} value={example.id}>
+                  {example.title} (Local)
+                </option>
+              ))}
+              {litActionExamples.map((example) => (
+                <option key={example.id} value={example.id}>
+                  {example.title}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={handleShare}
+              style={{
+                padding: "8px 14px",
+                borderRadius: "8px",
+                border: "1px solid #d1d5db",
+                backgroundColor: "#f3f4f6",
+                color: "#1f2937",
+                fontSize: "12px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Share Link
+            </button>
+            {shareStatus && (
+              <span
                 style={{
-                  padding: "4px 8px",
-                  backgroundColor:
-                    selectedExampleId === CUSTOM_SHARE_EXAMPLE_ID
-                      ? "#0ea5e9"
-                      : "#f3f4f6",
-                  color:
-                    selectedExampleId === CUSTOM_SHARE_EXAMPLE_ID
-                      ? "#ffffff"
-                      : "#374151",
-                  border: "none",
-                  borderRadius: "4px",
                   fontSize: "11px",
-                  cursor:
-                    disabled || isExecutingAction ? "not-allowed" : "pointer",
-                  transition: "background-color 0.15s ease",
+                  color: shareStatus.includes("Unable") ? "#dc2626" : "#15803d",
                 }}
               >
-                Shared Link
-              </button>
+                {shareStatus}
+              </span>
             )}
-            {litActionExamples.map((example) => {
-              const isActive = example.id === selectedExampleId;
-              const isDisabled = disabled || isExecutingAction;
-              const backgroundColor = isDisabled
-                ? "#9ca3af"
-                : isActive
-                ? "#6366f1"
-                : "#f3f4f6";
-              const color = isActive || isDisabled ? "#ffffff" : "#374151";
-              return (
-                <button
-                  key={example.id}
-                  onClick={() => loadExample(example.id)}
-                  disabled={isDisabled}
-                  title={example.description ?? example.title}
-                  style={{
-                    padding: "4px 8px",
-                    backgroundColor,
-                    color,
-                    border: "none",
-                    borderRadius: "4px",
-                    fontSize: "11px",
-                    cursor: isDisabled ? "not-allowed" : "pointer",
-                    transition: "background-color 0.15s ease",
-                  }}
-                >
-                  {example.title}
-                </button>
-              );
-            })}
           </div>
         )}
       </div>
@@ -1334,33 +1484,26 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
         <>
           {renderCompactLayout()}
 
-          <div
+          <button
+            onClick={executeLitAction}
+            disabled={executeButtonDisabled}
+            className={`w-full p-3 rounded-lg text-sm font-medium flex items-center justify-center gap-2 border-1 border-gray-200 ${
+              executeButtonDisabled
+                ? "bg-gray-400 cursor-not-allowed text-white"
+                : "bg-[#B7410D] text-white cursor-pointer"
+            }`}
+          >
+            {executeButtonContent}
+          </button>
+
+          {/* <div
             style={{
               display: "flex",
               gap: "10px",
               flexWrap: "wrap",
-              marginBottom: "12px",
+              marginTop: "10px",
             }}
           >
-            <button
-              onClick={executeLitAction}
-              disabled={executeButtonDisabled}
-              style={{
-                padding: "10px 18px",
-                borderRadius: "8px",
-                border: "1px solid #d1d5db",
-                backgroundColor: executeButtonDisabled ? "#9ca3af" : "#B7410D",
-                color: "#ffffff",
-                fontSize: "13px",
-                fontWeight: 600,
-                cursor: executeButtonDisabled ? "not-allowed" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
-              {executeButtonContent}
-            </button>
             <button
               onClick={handleShare}
               style={{
@@ -1376,18 +1519,7 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
             >
               Share Link
             </button>
-            {shareStatus && (
-              <span
-                style={{
-                  fontSize: "11px",
-                  color: shareStatus.includes("Unable") ? "#dc2626" : "#15803d",
-                  alignSelf: "center",
-                }}
-              >
-                {shareStatus}
-              </span>
-            )}
-          </div>
+          </div> */}
 
           <div style={{ marginTop: "16px" }}>{renderResultPanel(false)}</div>
         </>
