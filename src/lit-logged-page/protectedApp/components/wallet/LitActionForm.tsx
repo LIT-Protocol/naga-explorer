@@ -4,12 +4,24 @@
  * Form for executing Lit Actions with custom JavaScript code
  */
 
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Editor from "@monaco-editor/react";
 import { useLitAuth } from "../../../../lit-login-modal/LitAuthProvider";
 import { UIPKP } from "../../types";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 import { triggerLedgerRefresh } from "../../utils/ledgerRefresh";
+import {
+  getDefaultLitActionExample,
+  getLitActionExample,
+  litActionExamples,
+} from "../../../../lit-action-examples";
+import litActionsDefinitions from "../../../../lit-actions.d.ts?raw";
 
 // UI constants
 const EDITOR_FONT_SIZE_COMPACT = 10;
@@ -17,43 +29,11 @@ const EDITOR_FONT_SIZE_FULLSCREEN = 14;
 const EDITOR_LINE_HEIGHT = 20;
 const FULLSCREEN_Z_INDEX = 9999;
 
-// Default Lit Action code constants
-const DEFAULT_LIT_ACTION = `const { sigName, toSign, publicKey, } = jsParams;
-const { keccak256, arrayify } = ethers.utils;
+const DEFAULT_EXAMPLE = getDefaultLitActionExample();
+const DEFAULT_EXAMPLE_ID = DEFAULT_EXAMPLE?.id ?? null;
+const DEFAULT_EXAMPLE_CODE = DEFAULT_EXAMPLE?.code ?? "";
 
-(async () => {
-  const toSignBytes = new TextEncoder().encode(toSign);
-  const toSignBytes32 = keccak256(toSignBytes);
-  const toSignBytes32Array = arrayify(toSignBytes32);
-  
-  await Lit.Actions.signEcdsa({
-    toSign: toSignBytes32Array,
-    publicKey,
-    sigName,
-  });  
-})();`;
-
-const DEFAULT_LIT_ACTION2 = `(async () => {
-  const dAppUniqueAuthMethodType = "0x...";
-  const { publicKey, username, password, authMethodId } = jsParams;
-  
-  // Custom validation logic 
-  const EXPECTED_USERNAME = 'alice';
-  const EXPECTED_PASSWORD = 'lit';
-  const userIsValid = username === EXPECTED_USERNAME && password === EXPECTED_PASSWORD;
-  
-  // Check PKP permissions
-  const tokenId = await Lit.Actions.pubkeyToTokenId({ publicKey: publicKey });
-  const permittedAuthMethods = await Lit.Actions.getPermittedAuthMethods({ tokenId });
-  
-  const isPermitted = permittedAuthMethods.some((permittedAuthMethod) => {
-    return permittedAuthMethod["auth_method_type"] === dAppUniqueAuthMethodType && 
-           permittedAuthMethod["id"] === authMethodId;
-  });
-  
-  const isValid = isPermitted && userIsValid;
-  LitActions.setResponse({ response: isValid ? "true" : "false" });
-})();`;
+const LIT_ACTION_TYPES_URI = "ts:lit-actions.d.ts";
 
 interface LitActionFormProps {
   selectedPkp: UIPKP | null;
@@ -70,7 +50,12 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
   disabled = false,
 }) => {
   const { user, services } = useLitAuth();
-  const [litActionCode, setLitActionCode] = useState(DEFAULT_LIT_ACTION);
+  const [selectedExampleId, setSelectedExampleId] = useState<string | null>(
+    DEFAULT_EXAMPLE_ID
+  );
+  const [litActionCode, setLitActionCode] = useState<string>(
+    DEFAULT_EXAMPLE_CODE
+  );
   const [litActionResult, setLitActionResult] =
     useState<LitActionResult | null>(null);
   const [isExecutingAction, setIsExecutingAction] = useState(false);
@@ -78,12 +63,98 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const editorRef = useRef<any>(null);
   const triggerExecuteRef = useRef<() => void>(() => {});
+  const monacoConfiguredRef = useRef(false);
+  const litTypesDisposablesRef = useRef<any[]>([]);
+  const litTypesModelRef = useRef<any>(null);
   const [showShortcutTip, setShowShortcutTip] = useState(false);
-  const [activeExample, setActiveExample] = useState<"sign" | "blockchash">(
-    "sign"
+
+  const selectedExample = useMemo(
+    () =>
+      selectedExampleId ? getLitActionExample(selectedExampleId) : undefined,
+    [selectedExampleId]
   );
 
   const toggleFullscreen = () => setIsFullscreen((v) => !v);
+
+  const handleEditorMount = useCallback(
+    (editor: any, monaco: any) => {
+      editorRef.current = editor;
+      editor.addCommand(
+        monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+        () => triggerExecuteRef.current()
+      );
+
+      if (!monacoConfiguredRef.current) {
+        const compilerOptions = {
+          allowJs: true,
+          checkJs: true,
+          allowNonTsExtensions: true,
+          module: monaco.languages.typescript.ModuleKind.ESNext,
+          moduleResolution:
+            monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+          target: monaco.languages.typescript.ScriptTarget.ESNext,
+          typeRoots: ["node_modules/@types"],
+        };
+
+        monaco.languages.typescript.javascriptDefaults.setCompilerOptions(
+          compilerOptions
+        );
+        monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+          noSemanticValidation: false,
+          noSyntaxValidation: false,
+        });
+        monaco.languages.typescript.javascriptDefaults.setEagerModelSync(true);
+
+        monaco.languages.typescript.typescriptDefaults.setCompilerOptions(
+          compilerOptions
+        );
+        monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+          noSemanticValidation: false,
+          noSyntaxValidation: false,
+        });
+
+        monacoConfiguredRef.current = true;
+      }
+
+      if (litTypesDisposablesRef.current.length === 0) {
+        const modelUri = monaco.Uri.parse(LIT_ACTION_TYPES_URI);
+
+        litTypesDisposablesRef.current = [
+          monaco.languages.typescript.javascriptDefaults.addExtraLib(
+            litActionsDefinitions,
+            LIT_ACTION_TYPES_URI
+          ),
+          monaco.languages.typescript.typescriptDefaults.addExtraLib(
+            litActionsDefinitions,
+            LIT_ACTION_TYPES_URI
+          ),
+        ];
+
+        if (!monaco.editor.getModel(modelUri)) {
+          litTypesModelRef.current = monaco.editor.createModel(
+            litActionsDefinitions,
+            "typescript",
+            modelUri
+          );
+        } else if (!litTypesModelRef.current) {
+          litTypesModelRef.current = monaco.editor.getModel(modelUri);
+        }
+      }
+    },
+    [litActionsDefinitions]
+  );
+
+  useEffect(() => {
+    return () => {
+      litTypesDisposablesRef.current.forEach((disposable) => {
+        disposable?.dispose?.();
+      });
+      litTypesDisposablesRef.current = [];
+      litTypesModelRef.current?.dispose?.();
+      litTypesModelRef.current = null;
+      monacoConfiguredRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -129,14 +200,19 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
     setIsExecutingAction(true);
     setStatus("Executing Lit Action...");
     try {
+      const baseJsParams: Record<string, unknown> = {
+        publicKey: selectedPkp?.pubkey || user?.pkpInfo?.pubkey,
+      };
+      const exampleJsParams = selectedExample?.jsParams ?? {};
+      const jsParams = {
+        ...baseJsParams,
+        ...exampleJsParams,
+      };
+
       const result = await services.litClient.executeJs({
         authContext: user.authContext,
         code: litActionCode,
-        jsParams: {
-          publicKey: selectedPkp?.pubkey || user?.pkpInfo?.pubkey,
-          sigName: "sig1",
-          toSign: "Hello from Lit Action",
-        },
+        jsParams,
       });
       console.log("[executeLitAction] result:", result);
 
@@ -157,15 +233,16 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
     }
   };
 
-  const loadExample = (example: "sign" | "blockchash") => {
-    if (example === "sign") {
-      setLitActionCode(DEFAULT_LIT_ACTION);
-    } else {
-      setLitActionCode(DEFAULT_LIT_ACTION2);
+  const loadExample = useCallback((exampleId: string) => {
+    const example = getLitActionExample(exampleId);
+    if (!example) {
+      console.warn(`[LitActionForm] Unknown Lit Action example: ${exampleId}`);
+      return;
     }
+    setLitActionCode(example.code);
     setLitActionResult(null);
-    setActiveExample(example);
-  };
+    setSelectedExampleId(example.id);
+  }, []);
 
   return (
     <div
@@ -293,41 +370,43 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
       >
         <h3 style={{ margin: 0, color: "#1f2937" }}>⚡ Execute Lit Action</h3>
         {!isFullscreen && (
-          <div style={{ display: "flex", gap: "8px" }}>
-            <button
-              onClick={() => loadExample("sign")}
-              disabled={disabled || isExecutingAction}
-              style={{
-                padding: "4px 8px",
-                backgroundColor:
-                  disabled || isExecutingAction ? "#9ca3af" : "#6366f1",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                fontSize: "11px",
-                cursor:
-                  disabled || isExecutingAction ? "not-allowed" : "pointer",
-              }}
-            >
-              Load Sign Example
-            </button>
-            <button
-              onClick={() => loadExample("blockchash")}
-              disabled={disabled || isExecutingAction}
-              style={{
-                padding: "4px 8px",
-                backgroundColor:
-                  disabled || isExecutingAction ? "#9ca3af" : "#059669",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                fontSize: "11px",
-                cursor:
-                  disabled || isExecutingAction ? "not-allowed" : "pointer",
-              }}
-            >
-              Load Custom Auth Example
-            </button>
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              flexWrap: "wrap",
+            }}
+          >
+            {litActionExamples.map((example) => {
+              const isActive = example.id === selectedExampleId;
+              const isDisabled = disabled || isExecutingAction;
+              const backgroundColor = isDisabled
+                ? "#9ca3af"
+                : isActive
+                ? "#6366f1"
+                : "#f3f4f6";
+              const color = isActive || isDisabled ? "#ffffff" : "#374151";
+              return (
+                <button
+                  key={example.id}
+                  onClick={() => loadExample(example.id)}
+                  disabled={isDisabled}
+                  title={example.description ?? example.title}
+                  style={{
+                    padding: "4px 8px",
+                    backgroundColor,
+                    color,
+                    border: "none",
+                    borderRadius: "4px",
+                    fontSize: "11px",
+                    cursor: isDisabled ? "not-allowed" : "pointer",
+                    transition: "background-color 0.15s ease",
+                  }}
+                >
+                  {example.title}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -342,6 +421,17 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
         Run custom JavaScript code with your PKP. Use the examples above to get
         started.
       </p>
+      {selectedExample?.description && (
+        <p
+          style={{
+            margin: "0 0 16px 0",
+            color: "#4b5563",
+            fontSize: "12px",
+          }}
+        >
+          {selectedExample.description}
+        </p>
+      )}
 
       {isFullscreen ? (
         <div
@@ -363,35 +453,30 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
                 overflow: "hidden",
               }}
             >
-              <button
-                onClick={() => loadExample("sign")}
-                style={{
-                  padding: "6px 10px",
-                  fontSize: "11px",
-                  border: "none",
-                  borderRight: "1px solid #e5e7eb",
-                  backgroundColor:
-                    activeExample === "sign" ? "#ffffff" : "#f3f4f6",
-                  color: activeExample === "sign" ? "#111827" : "#374151",
-                  cursor: "pointer",
-                }}
-              >
-                Load Sign Example
-              </button>
-              <button
-                onClick={() => loadExample("blockchash")}
-                style={{
-                  padding: "6px 10px",
-                  fontSize: "11px",
-                  border: "none",
-                  backgroundColor:
-                    activeExample === "blockchash" ? "#ffffff" : "#f3f4f6",
-                  color: activeExample === "blockchash" ? "#111827" : "#374151",
-                  cursor: "pointer",
-                }}
-              >
-                Load Custom Auth Example
-              </button>
+              {litActionExamples.map((example, index) => {
+                const isActive = example.id === selectedExampleId;
+                return (
+                  <button
+                    key={example.id}
+                    onClick={() => loadExample(example.id)}
+                    style={{
+                      padding: "6px 10px",
+                      fontSize: "11px",
+                      border: "none",
+                      borderRight:
+                        index === litActionExamples.length - 1
+                          ? "none"
+                          : "1px solid #e5e7eb",
+                      backgroundColor: isActive ? "#ffffff" : "#f3f4f6",
+                      color: isActive ? "#111827" : "#374151",
+                      cursor: "pointer",
+                    }}
+                    title={example.description ?? example.title}
+                  >
+                    {example.title}
+                  </button>
+                );
+              })}
             </div>
             <div
               style={{
@@ -408,13 +493,7 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
                 onChange={(value) => setLitActionCode(value || "")}
                 language="javascript"
                 theme="vs-dark"
-                onMount={(editor, monaco) => {
-                  editorRef.current = editor;
-                  editor.addCommand(
-                    monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-                    () => triggerExecuteRef.current()
-                  );
-                }}
+                onMount={handleEditorMount}
                 options={{
                   minimap: { enabled: false },
                   wordWrap: "on",
@@ -542,13 +621,7 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
               onChange={(value) => setLitActionCode(value || "")}
               language="javascript"
               theme="vs-dark"
-              onMount={(editor, monaco) => {
-                editorRef.current = editor;
-                editor.addCommand(
-                  monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-                  () => triggerExecuteRef.current()
-                );
-              }}
+              onMount={handleEditorMount}
               options={{
                 minimap: { enabled: false },
                 wordWrap: "on",

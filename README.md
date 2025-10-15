@@ -2,6 +2,13 @@
 
 Lit Explorer Naga is an application that allows you to authenticate with Lit Protocol using the native Lit auth methods.
 
+## Adding Lit Action examples
+
+- Add a new file in `src/lit-action-examples/entries/` that default-exports a `LitActionExample`. The `id` must be unique.
+- Use `String.raw` to define multiline snippets, e.g. ``const code = String.raw\`...\`;`` and fill in `title`, optional `description`, `order`, and any default `jsParams`.
+- The registry auto-loads every file in that directory, so your example will appear in the Lit Action editor once you save and refresh the app.
+- Prefer small, focused samples that demonstrate a single concept; link to docs inside the description if extra context is needed.
+
 ## FAQs
 
 ### What "logged-in" means here
