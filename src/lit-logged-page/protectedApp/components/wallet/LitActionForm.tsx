@@ -23,7 +23,8 @@ import {
   getLitActionExample,
   litActionExamples,
 } from "../../../../lit-action-examples";
-import litActionsDefinitions from "../../../../lit-actions.d.ts?raw";
+import litActionsGlobalDefinition from "@lit-protocol/naga-la-types/globals?raw";
+import litActionsNamespaceDefinition from "@lit-protocol/naga-la-types?raw";
 
 // UI constants
 const EDITOR_FONT_SIZE_COMPACT = 10;
@@ -52,6 +53,16 @@ const LOCAL_STORAGE_KEY = "litExplorer.customExamples.v1";
 const BLANK_EXAMPLE_ID = "blank";
 
 const LIT_ACTION_TYPES_URI = "ts:lit-actions.d.ts";
+const litActionsDefinitions = [
+  litActionsGlobalDefinition
+    .replace(/\/\/\/\s*<reference path="\.\/types\.d\.ts"\s*\/>/, "")
+    .replace(/export\s*{\s*};?/g, ""),
+  litActionsNamespaceDefinition
+    .replace(/^export\s+declare\s+namespace/gm, "declare namespace")
+    .replace(/\bexport\s+namespace\b/g, "namespace"),
+]
+  .map((definition) => definition.trim())
+  .join("\n\n");
 
 const AUTO_LOGIN_INFO_MESSAGE =
   "Auto-login works only on naga-dev because it's a free, centralised testnet. On naga-test or other decentralized networks, recipients must sign in and cover execution costs themselves.";
