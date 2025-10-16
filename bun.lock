@@ -7,6 +7,7 @@
         "@lit-protocol/access-control-conditions": "8.0.1",
         "@lit-protocol/auth": "8.0.1",
         "@lit-protocol/lit-client": "8.0.1",
+        "@lit-protocol/naga-la-types": "^0.1.0",
         "@lit-protocol/networks": "8.0.1",
         "@monaco-editor/react": "^4.7.0",
         "@radix-ui/react-dropdown-menu": "^2.1.16",
@@ -328,6 +329,8 @@
     "@lit-protocol/logger": ["@lit-protocol/logger@8.0.1", "", { "dependencies": { "pino": "^9.6.0", "tslib": "1.14.1" } }, "sha512-OiHexweXAYOLvyKyZpPGbu6XIgX2m4NcjQ/Jczo9x7ApbH4+4xiX35psAD1sAfxNBTJfwoHQs1ixS+Y4gUICnw=="],
 
     "@lit-protocol/nacl": ["@lit-protocol/nacl@7.1.1", "", { "dependencies": { "tslib": "1.14.1" } }, "sha512-uuaHcVFnf3G4zRGYN2CrhSVHWXNcCY+VGG2uGS+pSk4EtyRvf9aw8mctQinItua02mTTj6SfFs508VSJ1imWsw=="],
+
+    "@lit-protocol/naga-la-types": ["@lit-protocol/naga-la-types@0.1.0", "", {}, "sha512-6RYP6aQ25C8GunoDUdyZTSlCJuZqcbeJD2BuUaVp+EDKJ5LF6Z8bnKHjnF9XljtXWPdR9OSOJ7sc5SsQF7If2g=="],
 
     "@lit-protocol/networks": ["@lit-protocol/networks@8.0.1", "", { "dependencies": { "@ethersproject/contracts": "5.8.0", "@ethersproject/providers": "5.7.0", "@ethersproject/transactions": "5.7.0", "@jest/globals": "29.7.0", "@lit-protocol/access-control-conditions": "8.0.1", "@lit-protocol/access-control-conditions-schemas": "8.0.1", "@lit-protocol/auth-helpers": "8.0.1", "@lit-protocol/constants": "8.0.1", "@lit-protocol/contracts": "0.5.2", "@lit-protocol/crypto": "8.0.1", "@lit-protocol/logger": "8.0.1", "@lit-protocol/nacl": "7.1.1", "@lit-protocol/schemas": "8.0.1", "@lit-protocol/types": "8.0.1", "@lit-protocol/uint8arrays": "7.1.1", "@lit-protocol/wasm": "8.0.1", "@noble/curves": "^1.8.1", "@noble/hashes": "^1.8.0", "@openagenda/verror": "^3.1.4", "@t3-oss/env-core": "0.13.8", "@typechain/ethers-v6": "0.5.1", "@wagmi/core": "^2.17.1", "ajv": "^8.12.0", "bs58": "^6.0.0", "elysia": "^1.2.25", "ethers": "^5.7.1", "node-localstorage": "^3.0.5", "pako": "^2.1.0", "pino": "^9.6.0", "pino-caller": "^4.0.0", "siwe": "^2.3.2", "siwe-recap": "0.0.2-alpha.0", "tslib": "^2.8.1", "typechain": "8.3.2", "viem": "2.29.4", "zod": "3.24.3", "zod-validation-error": "3.4.0" } }, "sha512-t4Vj/29wBGZHkjdSAPZcjUIurG+Fs116Zoht8LFHpmL4ujiCkoIIU295+TiYs4qI4VjMI44HLg761l1T2R28Jw=="],
 
