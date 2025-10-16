@@ -446,7 +446,7 @@ export const LitAuthProvider: React.FC<LitAuthProviderProps> = ({
     resolve: () => void;
   } | null>(null);
   const servicesRef = useRef<LitServices | null>(services);
-  const setupServicesRef = useRef<typeof setupServices>();
+  const setupServicesRef = useRef<typeof setupServices>(setupServices);
   const isServicesReadyRef = useRef<boolean>(isServicesReady);
 
   useEffect(() => {
@@ -888,9 +888,10 @@ export const LitAuthProvider: React.FC<LitAuthProviderProps> = ({
       return servicesRef.current;
     }
 
-    if (setupServicesRef.current) {
+    const setupServicesFn = setupServicesRef.current;
+    if (setupServicesFn) {
       try {
-        const newServices = await setupServicesRef.current();
+        const newServices = await setupServicesFn();
         if (newServices) {
           servicesRef.current = newServices;
           return newServices;
