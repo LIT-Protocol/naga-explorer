@@ -12,6 +12,8 @@ import React, {
   useState,
 } from "react";
 import Editor from "@monaco-editor/react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { ChevronDown, Check, Share2, Info } from "lucide-react";
 import { useLitAuth } from "../../../../lit-login-modal/LitAuthProvider";
 import { UIPKP } from "../../types";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
@@ -50,6 +52,389 @@ const LOCAL_STORAGE_KEY = "litExplorer.customExamples.v1";
 const BLANK_EXAMPLE_ID = "blank";
 
 const LIT_ACTION_TYPES_URI = "ts:lit-actions.d.ts";
+
+const AUTO_LOGIN_INFO_MESSAGE =
+  "Auto-login works only on naga-dev because it's a free, centralised testnet. On naga-test or other decentralized networks, recipients must sign in and cover execution costs themselves.";
+
+const CTA_HEIGHT = 44;
+
+const SectionHeader: React.FC<{ title: string; textColor?: string }> = ({
+  title,
+  textColor = "#111827",
+}) => (
+  <div
+    style={{
+      marginBottom: "12px",
+      fontSize: "13px",
+      fontWeight: 600,
+      textTransform: "uppercase",
+      letterSpacing: "0.08em",
+      position: "relative",
+      paddingBottom: "10px",
+      color: textColor,
+    }}
+  >
+    {title}
+    <span
+      style={{
+        position: "absolute",
+        left: 0,
+        bottom: 0,
+        width: "60px",
+        height: "2px",
+        backgroundColor: "#B7410D",
+        borderRadius: "999px",
+      }}
+    />
+  </div>
+);
+
+type ExampleBadgeTone = "shared" | "local" | "default";
+
+interface ExampleDropdownOption {
+  id: string;
+  label: string;
+  description?: string;
+  badgeLabel?: string;
+  badgeTone?: ExampleBadgeTone;
+}
+
+interface ExampleSelectorProps {
+  options: ExampleDropdownOption[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  disabled?: boolean;
+  triggerId?: string;
+}
+
+const BADGE_STYLES: Record<ExampleBadgeTone, { background: string; border: string; color: string }> = {
+  shared: {
+    background: "#E0F2FE",
+    border: "#93C5FD",
+    color: "#1D4ED8",
+  },
+  local: {
+    background: "#FEF3C7",
+    border: "#FCD34D",
+    color: "#B45309",
+  },
+  default: {
+    background: "#E5E7EB",
+    border: "#D1D5DB",
+    color: "#4B5563",
+  },
+};
+
+const ExampleSelector: React.FC<ExampleSelectorProps> = ({
+  options,
+  selectedId,
+  onSelect,
+  disabled = false,
+  triggerId,
+}) => {
+  const currentOption = useMemo(() => {
+    if (!options.length) return null;
+    const fallback = options[0];
+    return options.find((option) => option.id === selectedId) ?? fallback;
+  }, [options, selectedId]);
+
+  const value = currentOption?.id ?? "";
+
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild disabled={disabled}>
+        <button
+          id={triggerId}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            padding: "10px 14px",
+            border: "1px solid #d1d5db",
+            borderRadius: "8px",
+            background: disabled ? "#f3f4f6" : "white",
+            color: disabled ? "#9ca3af" : "#111827",
+            cursor: disabled ? "not-allowed" : "pointer",
+            minWidth: 240,
+            justifyContent: "space-between",
+            alignSelf: "flex-start",
+            minHeight: CTA_HEIGHT,
+          }}
+        >
+          <span
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: "2px",
+              textAlign: "left",
+            }}
+          >
+            <span style={{ fontSize: "12px", fontWeight: 600 }}>
+              {currentOption?.label ?? "Select example"}
+            </span>
+            {currentOption?.description && (
+              <span style={{ fontSize: "11px", color: "#6b7280" }}>
+                {currentOption.description}
+              </span>
+            )}
+          </span>
+          <ChevronDown size={14} style={{ color: "#6b7280" }} />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          sideOffset={6}
+          align="start"
+          style={{
+            background: "white",
+            border: "1px solid #e5e7eb",
+            borderRadius: "8px",
+            padding: "6px",
+            boxShadow:
+              "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)",
+            minWidth: 260,
+            zIndex: FULLSCREEN_Z_INDEX + 5,
+          }}
+        >
+          <DropdownMenu.RadioGroup
+            value={value}
+            onValueChange={(next) => onSelect(next)}
+          >
+            {options.map((option) => {
+              const isSelected = option.id === value;
+              const badgeTone = option.badgeTone ?? "default";
+              const badgeStyle = BADGE_STYLES[badgeTone];
+              return (
+                <DropdownMenu.RadioItem
+                  key={option.id}
+                  value={option.id}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "4px",
+                    padding: "8px 10px",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    color: "#111827",
+                    backgroundColor: isSelected ? "#eff6ff" : "transparent",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "8px",
+                    }}
+                  >
+                    <span style={{ fontWeight: isSelected ? 600 : 500 }}>
+                      {option.label}
+                    </span>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      {option.badgeLabel && (
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            color: badgeStyle.color,
+                            background: badgeStyle.background,
+                            border: `1px solid ${badgeStyle.border}`,
+                            padding: "1px 6px",
+                            borderRadius: 9999,
+                            textTransform: "uppercase",
+                            letterSpacing: 0.4,
+                          }}
+                        >
+                          {option.badgeLabel}
+                        </span>
+                      )}
+                      <div
+                        style={{
+                          width: 16,
+                          height: 16,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <DropdownMenu.ItemIndicator>
+                          <Check size={12} />
+                        </DropdownMenu.ItemIndicator>
+                      </div>
+                    </div>
+                  </div>
+                  {option.description && (
+                    <span style={{ fontSize: "11px", color: "#6b7280" }}>
+                      {option.description}
+                    </span>
+                  )}
+                </DropdownMenu.RadioItem>
+              );
+            })}
+          </DropdownMenu.RadioGroup>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
+};
+
+interface ShareLinkMenuProps {
+  disabled?: boolean;
+  onShareStandard: () => void;
+  onShareAutoLogin: () => void;
+  showInfo: boolean;
+  toggleInfo: () => void;
+  triggerId?: string;
+}
+
+const ShareLinkMenu: React.FC<ShareLinkMenuProps> = ({
+  disabled = false,
+  onShareStandard,
+  onShareAutoLogin,
+  showInfo,
+  toggleInfo,
+  triggerId,
+}) => {
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild disabled={disabled}>
+        <button
+          id={triggerId}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "10px 16px",
+            borderRadius: "8px",
+            border: "1px solid #d1d5db",
+            background: disabled ? "#f3f4f6" : "#ffffff",
+            color: disabled ? "#9ca3af" : "#1f2937",
+            cursor: disabled ? "not-allowed" : "pointer",
+            fontSize: "12px",
+            fontWeight: 600,
+            alignSelf: "flex-start",
+            height: CTA_HEIGHT,
+          }}
+        >
+          <Share2 size={14} />
+          Share
+          <ChevronDown size={14} style={{ color: "#6b7280" }} />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          sideOffset={6}
+          align="start"
+          style={{
+            background: "white",
+            border: "1px solid #e5e7eb",
+            borderRadius: "8px",
+            padding: "6px",
+            boxShadow:
+              "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)",
+            minWidth: 220,
+            zIndex: FULLSCREEN_Z_INDEX + 6,
+          }}
+        >
+          <DropdownMenu.Item
+            onSelect={(event) => {
+              event.preventDefault();
+              onShareStandard();
+            }}
+            style={{
+              padding: "8px 10px",
+              borderRadius: "6px",
+              fontSize: "12px",
+              cursor: "pointer",
+              color: "#111827",
+            }}
+          >
+            Copy Share Link
+          </DropdownMenu.Item>
+          <DropdownMenu.Item
+            onSelect={(event) => {
+              event.preventDefault();
+              onShareAutoLogin();
+            }}
+            style={{
+              padding: "8px 10px",
+              borderRadius: "6px",
+              fontSize: "12px",
+              cursor: "pointer",
+              color: "#1d4ed8",
+              backgroundColor: "#eff6ff",
+            }}
+          >
+            Copy Auto-Login Link
+          </DropdownMenu.Item>
+          <div
+            style={{
+              borderTop: "1px solid #e5e7eb",
+              margin: "8px -6px 6px",
+            }}
+          />
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "6px",
+              padding: "2px 2px 0",
+            }}
+          >
+            <button
+              onClick={(event) => {
+                event.preventDefault();
+                toggleInfo();
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "6px",
+                borderRadius: "6px",
+                border: "1px solid transparent",
+                backgroundColor: showInfo ? "#0f172a" : "transparent",
+                color: showInfo ? "#f9fafb" : "#1d4ed8",
+                fontSize: "11px",
+                cursor: "pointer",
+              }}
+            >
+              <Info size={12} />
+              Why is auto-login limited?
+            </button>
+            {showInfo && (
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "#1f2937",
+                  backgroundColor: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "6px",
+                  padding: "8px",
+                  lineHeight: 1.45,
+                  maxWidth: "240px",
+                  width: "100%",
+                  alignSelf: "flex-start",
+                  overflowWrap: "break-word",
+                }}
+              >
+                {AUTO_LOGIN_INFO_MESSAGE}
+              </div>
+            )}
+          </div>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
+};
 
 const encodeForShare = (value: string) => {
   const encoder = new TextEncoder();
@@ -111,6 +496,7 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
   const litTypesModelRef = useRef<any>(null);
   const [showShortcutTip, setShowShortcutTip] = useState(false);
   const [showParsedModal, setShowParsedModal] = useState(false);
+  const [showAutoLoginInfo, setShowAutoLoginInfo] = useState(false);
 
   const selectedExample = useMemo(() => {
     if (selectedExampleId === BLANK_EXAMPLE_ID) {
@@ -159,6 +545,46 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
       : undefined;
   }, [jsParamsInput, litActionCode, selectedExampleId, localExamples]);
 
+  const exampleOptions = useMemo<ExampleDropdownOption[]>(() => {
+    const options: ExampleDropdownOption[] = [
+      {
+        id: BLANK_EXAMPLE_ID,
+        label: "New Blank Action",
+        description: "Start from scratch",
+      },
+    ];
+
+    if (hasSharedLink) {
+      options.push({
+        id: CUSTOM_SHARE_EXAMPLE_ID,
+        label: "Shared Code",
+        description: "Loaded from shared link",
+        badgeLabel: "Shared",
+        badgeTone: "shared",
+      });
+    }
+
+    localExamples.forEach((example) => {
+      options.push({
+        id: example.id,
+        label: example.title,
+        description: "Saved locally",
+        badgeLabel: "Local",
+        badgeTone: "local",
+      });
+    });
+
+    litActionExamples.forEach((example) => {
+      options.push({
+        id: example.id,
+        label: example.title,
+        description: example.description,
+      });
+    });
+
+    return options;
+  }, [hasSharedLink, localExamples]);
+
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -190,6 +616,7 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
         }
         setSelectedExampleId(CUSTOM_SHARE_EXAMPLE_ID);
         setHasSharedLink(true);
+        setIsFullscreen(true);
       }
     } catch (error) {
       console.error("Failed to decode shared Lit Action state", error);
@@ -316,10 +743,10 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
   const executeButtonContent = isExecutingAction ? (
     <>
       <LoadingSpinner size={16} />
-      Executing...
+      Running...
     </>
   ) : (
-    "Execute Lit Action"
+    "Run"
   );
 
   const toggleFullscreen = () => setIsFullscreen((v) => !v);
@@ -518,52 +945,36 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
       >
         <div
           style={{
-            border: "1px solid #d1d5db",
+            border: "1px solid #e5e7eb",
             borderRadius: "8px",
-            padding: "12px",
-            backgroundColor: "#ffffff",
+            padding: "16px",
+            backgroundColor: "#f9fafb",
+            color: "#111827",
             display: "flex",
             flexDirection: "column",
             gap: "12px",
             opacity: disabled ? 0.6 : 1,
+            minHeight: 0,
           }}
         >
-          <h4
-            style={{
-              margin: 0,
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "#111827",
-              letterSpacing: "0.04em",
-            }}
-          >
-            Code
-          </h4>
+          <SectionHeader title="Lit Action" />
           {renderCodeEditor(codeEditorHeight, false)}
         </div>
         <div
           style={{
-            border: "1px solid #d1d5db",
+            border: "1px solid #e5e7eb",
             borderRadius: "8px",
-            padding: "12px",
-            backgroundColor: "#ffffff",
+            padding: "16px",
+            backgroundColor: "#f9fafb",
+            color: "#111827",
             display: "flex",
             flexDirection: "column",
             gap: "12px",
             opacity: disabled ? 0.6 : 1,
+            minHeight: 0,
           }}
         >
-          <h4
-            style={{
-              margin: 0,
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "#111827",
-              letterSpacing: "0.04em",
-            }}
-          >
-            JS Params
-          </h4>
+          <SectionHeader title="JS Params" />
           {renderParamsContent(paramsEditorHeight, false)}
         </div>
       </div>
@@ -574,8 +985,8 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
     const codeEditorHeight = "calc(100vh - 240px)";
     const paramsEditorHeight = "25vh";
     const fullPanelStyle = {
-      border: "1px solid #1f2937",
-      background: "#0f172a",
+      border: "1px solid #E5E7EB",
+      background: "#F9FAFB",
       borderRadius: "8px",
       padding: "16px",
       color: "#f9fafb",
@@ -608,31 +1019,7 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
             border: "1px solid #e5e7eb",
           }}
         >
-          <div
-            style={{
-              marginBottom: "12px",
-              fontSize: "13px",
-              fontWeight: 600,
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              position: "relative",
-              paddingBottom: "10px",
-              color: "#111827",
-            }}
-          >
-            Lit Action
-            <span
-              style={{
-                position: "absolute",
-                left: 0,
-                bottom: 0,
-                width: "60px",
-                height: "2px",
-                backgroundColor: "#B7410D",
-                borderRadius: "999px",
-              }}
-            />
-          </div>
+          <SectionHeader title="Lit Action" />
           <div
             style={{
               flex: 1,
@@ -651,16 +1038,7 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
           }}
         >
           <div style={fullPanelStyle}>
-            <h4
-              style={{
-                margin: 0,
-                fontSize: "13px",
-                fontWeight: 600,
-                letterSpacing: "0.04em",
-              }}
-            >
-              JS Params
-            </h4>
+            <SectionHeader title="JS Params" textColor="#111827" />
             <div
               style={{
                 flex: 1,
@@ -676,16 +1054,7 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
               justifyContent: "flex-start",
             }}
           >
-            <h4
-              style={{
-                margin: 0,
-                fontSize: "13px",
-                fontWeight: 600,
-                letterSpacing: "0.04em",
-              }}
-            >
-              Execution Result
-            </h4>
+            <SectionHeader title="Execution Result" textColor="#111827" />
             {renderResultPanel(true)}
           </div>
         </div>
@@ -833,6 +1202,134 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
   };
 
   const renderResultPanel = (fullscreen: boolean) => {
+    if (!fullscreen) {
+      const emptyState = (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: "6px",
+            border: "1px dashed #d1d5db",
+            color: "#6b7280",
+            fontSize: "12px",
+            padding: "16px",
+            minHeight: 120,
+          }}
+        >
+          Run an action to see the response here.
+        </div>
+      );
+
+      if (!litActionResult) {
+        return (
+          <div
+            style={{
+              border: "1px solid #e5e7eb",
+              borderRadius: "8px",
+              padding: "16px",
+              backgroundColor: "#f9fafb",
+              color: "#111827",
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px",
+            }}
+          >
+            <SectionHeader title="Execution Result" />
+            {emptyState}
+          </div>
+        );
+      }
+
+      const messageBackground = status.includes("successfully")
+        ? "#f0fdf4"
+        : "#fef2f2";
+      const messageBorder = status.includes("successfully")
+        ? "1px solid #bbf7d0"
+        : "1px solid #fecaca";
+      const messageColor = status.includes("successfully")
+        ? "#15803d"
+        : "#dc2626";
+
+      return (
+        <div
+          style={{
+            border: "1px solid #e5e7eb",
+            borderRadius: "8px",
+            padding: "16px",
+            backgroundColor: "#f9fafb",
+            color: "#111827",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+          }}
+        >
+          <SectionHeader title="Execution Result" />
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "12px",
+              fontSize: "11px",
+              color: "#6b7280",
+            }}
+          >
+            <span>
+              Executed at: {new Date(litActionResult.timestamp).toLocaleString()}
+            </span>
+            {parsedResponse && (
+              <button
+                onClick={() => setShowParsedModal(true)}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: "6px",
+                  border: "1px solid rgba(59,130,246,0.4)",
+                  backgroundColor: "#e0f2fe",
+                  color: "#1d4ed8",
+                  fontSize: "11px",
+                  cursor: "pointer",
+                }}
+              >
+                View Parsable JSON
+              </button>
+            )}
+          </div>
+          {status && (
+            <div
+              style={{
+                padding: "8px 12px",
+                borderRadius: "6px",
+                backgroundColor: messageBackground,
+                border: messageBorder,
+                color: messageColor,
+                fontSize: "12px",
+              }}
+            >
+              {status}
+            </div>
+          )}
+          <pre
+            style={{
+              flex: 1,
+              margin: 0,
+              overflow: "auto",
+              backgroundColor: "#ffffff",
+              borderRadius: "6px",
+              border: "1px solid #e5e7eb",
+              padding: "12px",
+              fontFamily: "monospace",
+              fontSize: "11px",
+              whiteSpace: "pre-wrap",
+              minHeight: 120,
+            }}
+          >
+            {rawResultString}
+          </pre>
+        </div>
+      );
+    }
+
     if (!litActionResult) {
       return (
         <div
@@ -842,8 +1339,8 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
             alignItems: "center",
             justifyContent: "center",
             borderRadius: "6px",
-            border: fullscreen ? "1px dashed #1f2937" : "1px dashed #d1d5db",
-            color: fullscreen ? "#9ca3af" : "#6b7280",
+            border: "1px dashed #1f2937",
+            color: "#9ca3af",
             fontSize: "12px",
             padding: "16px",
           }}
@@ -859,34 +1356,22 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
       flexDirection: "column" as const,
       minHeight: 0,
       gap: "12px",
-      backgroundColor: fullscreen ? "#111827" : "#ffffff",
-      border: fullscreen ? "1px solid #1f2937" : "1px solid #e5e7eb",
+      backgroundColor: "#111827",
+      border: "1px solid #1f2937",
       borderRadius: "8px",
       padding: "14px",
-      color: fullscreen ? "#f9fafb" : "#111827",
+      color: "#f9fafb",
     };
 
     const messageBackground = status.includes("successfully")
-      ? fullscreen
-        ? "rgba(34,197,94,0.15)"
-        : "#f0fdf4"
-      : fullscreen
-      ? "rgba(248,113,113,0.15)"
-      : "#fef2f2";
+      ? "rgba(34,197,94,0.15)"
+      : "rgba(248,113,113,0.15)";
     const messageBorder = status.includes("successfully")
-      ? fullscreen
-        ? "1px solid rgba(34,197,94,0.4)"
-        : "1px solid #bbf7d0"
-      : fullscreen
-      ? "1px solid rgba(248,113,113,0.4)"
-      : "1px solid #fecaca";
+      ? "1px solid rgba(34,197,94,0.4)"
+      : "1px solid rgba(248,113,113,0.4)";
     const messageColor = status.includes("successfully")
-      ? fullscreen
-        ? "#bbf7d0"
-        : "#15803d"
-      : fullscreen
-      ? "#fecaca"
-      : "#dc2626";
+      ? "#bbf7d0"
+      : "#fecaca";
 
     return (
       <div style={containerStyles}>
@@ -941,9 +1426,9 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
             flex: 1,
             margin: 0,
             overflow: "auto",
-            backgroundColor: fullscreen ? "#0f172a" : "#f9fafb",
+            backgroundColor: "#0f172a",
             borderRadius: "6px",
-            border: fullscreen ? "1px solid #1f2937" : "1px solid #e5e7eb",
+            border: "1px solid #1f2937",
             padding: "12px",
             fontFamily: "monospace",
             fontSize: "11px",
@@ -1139,32 +1624,238 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
     setShowParsedModal(false);
   }, [createBlankExample, localExamples]);
 
-  const handleShare = useCallback(async () => {
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.set("code", encodeForShare(litActionCode));
-      url.searchParams.set("params", encodeForShare(jsParamsInput));
-      const shareUrl = url.toString();
+  const handleShare = useCallback(
+    async (options?: { autoLogin?: boolean }) => {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set("code", encodeForShare(litActionCode));
+        url.searchParams.set("params", encodeForShare(jsParamsInput));
+        if (options?.autoLogin) {
+          url.searchParams.set("autoLogin", "1");
+        } else {
+          url.searchParams.delete("autoLogin");
+        }
+        const shareUrl = url.toString();
 
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(shareUrl);
-        setShareStatus("Share link copied!");
-      } else {
-        window.prompt("Copy this Lit Action link", shareUrl);
-        setShareStatus("Share link ready to copy");
+        if (navigator?.clipboard?.writeText) {
+          await navigator.clipboard.writeText(shareUrl);
+          setShareStatus(
+            options?.autoLogin
+              ? "Auto-login link copied! (naga-dev only)"
+              : "Share link copied!"
+          );
+        } else {
+          window.prompt("Copy this Lit Action link", shareUrl);
+          setShareStatus(
+            options?.autoLogin
+              ? "Auto-login link ready to copy (naga-dev only)"
+              : "Share link ready to copy"
+          );
+        }
+
+        window.history.replaceState({}, "", shareUrl);
+        setHasSharedLink(true);
+        setSelectedExampleId(CUSTOM_SHARE_EXAMPLE_ID);
+        if (options?.autoLogin) {
+          setShowAutoLoginInfo(false);
+        }
+      } catch (error) {
+        console.error("Failed to generate share link", error);
+        setShareStatus("Unable to copy share link");
       }
+    },
+    [jsParamsInput, litActionCode]
+  );
 
-      window.history.replaceState({}, "", shareUrl);
-      setHasSharedLink(true);
-      setSelectedExampleId(CUSTOM_SHARE_EXAMPLE_ID);
-    } catch (error) {
-      console.error("Failed to generate share link", error);
-      setShareStatus("Unable to copy share link");
+  const shareStatusIsError =
+    typeof shareStatus === "string" &&
+    shareStatus.toLowerCase().includes("unable");
+
+const shareStatusPalette = shareStatusIsError
+  ? {
+      backgroundColor: "#7f1d1d",
+      borderColor: "#fca5a5",
+      color: "#fef2f2",
     }
-  }, [jsParamsInput, litActionCode]);
+  : {
+      backgroundColor: "#065f46",
+      borderColor: "#34d399",
+      color: "#ecfdf5",
+    };
+
+  const renderActionToolbar = (fullscreen: boolean) => {
+    const divider = (
+      <div
+        style={{
+          width: "1px",
+          height: CTA_HEIGHT,
+          backgroundColor: "#e5e7eb",
+        }}
+      />
+    );
+
+    const fullscreenToggle = (
+      <button
+        id="lit-action-fullscreen-toggle"
+        onClick={toggleFullscreen}
+        aria-label={fullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+        title={fullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+        disabled={disabled}
+        style={{
+          width: CTA_HEIGHT,
+          height: CTA_HEIGHT,
+          borderRadius: "10px",
+          border: "1px solid #d1d5db",
+          backgroundColor: fullscreen ? "#111827" : "#ffffff",
+          color: fullscreen ? "#f9fafb" : "#1f2937",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.6 : 1,
+        }}
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path d="M9 3H3v6h2V5h4V3zm12 6V3h-6v2h4v4h2zM3 15v6h6v-2H5v-4H3zm18 6v-6h-2v4h-4v2h6z" />
+        </svg>
+      </button>
+    );
+
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: "12px",
+          flexWrap: "wrap",
+          ...(fullscreen ? { marginRight: 8 } : {}),
+        }}
+      >
+        <button
+          id="lit-action-run"
+          onClick={executeLitAction}
+          disabled={executeButtonDisabled}
+          onMouseEnter={() => setShowShortcutTip(true)}
+          onMouseLeave={() => setShowShortcutTip(false)}
+          style={{
+            padding: "12px 20px",
+            borderRadius: "10px",
+            border: "1px solid transparent",
+            backgroundColor: executeButtonDisabled ? "#9ca3af" : "#B7410D",
+            fontSize: "12px",
+            fontWeight: 700,
+            letterSpacing: "0.05em",
+            color: "#ffffff",
+            cursor: executeButtonDisabled ? "not-allowed" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            position: "relative",
+            alignSelf: "flex-start",
+            minHeight: CTA_HEIGHT,
+          }}
+        >
+          {executeButtonContent}
+          {fullscreen && showShortcutTip && !executeButtonDisabled && (
+            <span
+              style={{
+                position: "absolute",
+                top: "calc(100% + 8px)",
+                right: 0,
+                backgroundColor: "#111827",
+                color: "#F9FAFB",
+                borderRadius: "6px",
+                padding: "6px 10px",
+                fontSize: "11px",
+                whiteSpace: "nowrap",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+              }}
+            >
+              Press Cmd+Enter (Mac) / Ctrl+Enter (Windows)
+            </span>
+          )}
+        </button>
+        {divider}
+        <div style={{ minWidth: 240 }}>
+          <ExampleSelector
+            triggerId="lit-action-example-selector"
+            options={exampleOptions}
+            selectedId={selectedExampleId}
+            onSelect={loadExample}
+            disabled={disabled || isExecutingAction}
+          />
+        </div>
+        <ShareLinkMenu
+          triggerId="lit-action-share"
+          disabled={disabled || isExecutingAction}
+          onShareStandard={() => handleShare()}
+          onShareAutoLogin={() => handleShare({ autoLogin: true })}
+          showInfo={showAutoLoginInfo}
+          toggleInfo={() => setShowAutoLoginInfo((prev) => !prev)}
+        />
+        <button
+          id="lit-action-save"
+          onClick={saveLocalExample}
+          aria-label="Save Lit Action"
+          title="Save"
+          style={{
+            padding: "8px 14px",
+            borderRadius: "8px",
+            border: "1px solid #1f2937",
+            backgroundColor: "#111827",
+            color: "#f9fafb",
+            fontSize: "12px",
+            fontWeight: 600,
+            cursor: "pointer",
+            display: "grid",
+            placeItems: "center",
+            width: CTA_HEIGHT,
+            height: CTA_HEIGHT,
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7ZM7 5h8v4H7Zm5 14a3 3 0 1 1 3-3 3 3 0 0 1-3 3Z" />
+          </svg>
+        </button>
+        {selectedExampleId?.startsWith(CUSTOM_LOCAL_PREFIX) && (
+          <button
+            id="lit-action-delete"
+            onClick={deleteLocalExample}
+            style={{
+              padding: "8px 14px",
+              borderRadius: "8px",
+              border: "1px solid #dc2626",
+              backgroundColor: "#fee2e2",
+              color: "#991b1b",
+              fontSize: "12px",
+              fontWeight: 600,
+              cursor: "pointer",
+              height: CTA_HEIGHT,
+            }}
+          >
+            Delete
+          </button>
+        )}
+        {fullscreenToggle}
+      </div>
+    );
+  };
 
   return (
-    <div
+    <>
+      <div
       style={{
         padding: "20px",
         backgroundColor: "#ffffff",
@@ -1185,275 +1876,18 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
             }
           : {}),
       }}
-    >
-      <button
-        onClick={toggleFullscreen}
-        aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-        title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-        style={{
-          position: "absolute",
-          top: 8,
-          right: 8,
-          width: 28,
-          height: 28,
-          display: "grid",
-          placeItems: "center",
-          borderRadius: 6,
-          border: "1px solid #d1d5db",
-          background: "white",
-          cursor: disabled ? "not-allowed" : "pointer",
-          opacity: disabled ? 0.6 : 1,
-          zIndex: FULLSCREEN_Z_INDEX + 1,
-          outline: "none",
-          boxShadow: "none",
-        }}
-        disabled={disabled}
       >
-        {isFullscreen ? (
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            aria-hidden="true"
-          >
-            <path d="M9 3H3v6h2V5h4V3zm12 6V3h-6v2h4v4h2zM3 15v6h6v-2H5v-4H3zm18 6v-6h-2v4h-4v2h6z" />
-          </svg>
-        ) : (
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            aria-hidden="true"
-          >
-            <path d="M9 3H3v6h2V5h4V3zm12 6V3h-6v2h4v4h2zM3 15v6h6v-2H5v-4H3zm18 6v-6h-2v4h-4v2h6z" />
-          </svg>
-        )}
-      </button>
-      {isFullscreen && showShortcutTip && null}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: "16px",
-          paddingRight: 40,
+          // paddingRight: 40,
         }}
       >
         <h3 style={{ margin: 0, color: "#1f2937" }}>⚡ Execute Lit Action</h3>
-        {isFullscreen ? (
-          <div
-            style={{
-              display: "flex",
-              gap: "12px",
-              alignItems: "center",
-            }}
-          >
-            <div
-              style={{
-                position: "relative",
-              }}
-            >
-              <select
-                value={selectedExampleId ?? ""}
-                onChange={(event) => loadExample(event.target.value)}
-                disabled={disabled || isExecutingAction}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: "6px",
-                  border: "1px solid #d1d5db",
-                  backgroundColor: "#ffffff",
-                  fontSize: "12px",
-                  minWidth: "220px",
-                }}
-              >
-                <option value={BLANK_EXAMPLE_ID}>New Blank Action</option>
-                {hasSharedLink && (
-                  <option value={CUSTOM_SHARE_EXAMPLE_ID}>Shared Code</option>
-                )}
-                {localExamples.map((example) => (
-                  <option key={example.id} value={example.id}>
-                    {example.title} (Local)
-                  </option>
-                ))}
-                {litActionExamples.map((example) => (
-                  <option key={example.id} value={example.id}>
-                    {example.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              onClick={executeLitAction}
-              disabled={executeButtonDisabled}
-              onMouseEnter={() => setShowShortcutTip(true)}
-              onMouseLeave={() => setShowShortcutTip(false)}
-              style={{
-                padding: "8px 16px",
-                borderRadius: "8px",
-                border: "1px solid #d1d5db",
-                backgroundColor: executeButtonDisabled ? "#9ca3af" : "#B7410D",
-                fontSize: "12px",
-                fontWeight: 600,
-                color: "#ffffff",
-                cursor: executeButtonDisabled ? "not-allowed" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                position: "relative",
-              }}
-            >
-              {executeButtonContent}
-              {showShortcutTip && !executeButtonDisabled && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 8px)",
-                    right: 0,
-                    backgroundColor: "#111827",
-                    color: "#F9FAFB",
-                    borderRadius: "6px",
-                    padding: "6px 10px",
-                    fontSize: "11px",
-                    whiteSpace: "nowrap",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-                  }}
-                >
-                  Press Cmd+Enter (Mac) / Ctrl+Enter (Windows)
-                </span>
-              )}
-            </button>
-            <button
-              onClick={handleShare}
-              style={{
-                padding: "8px 14px",
-                borderRadius: "8px",
-                border: "1px solid #d1d5db",
-                backgroundColor: "#f3f4f6",
-                color: "#1f2937",
-                fontSize: "12px",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Share Link
-            </button>
-            <button
-              onClick={saveLocalExample}
-              style={{
-                padding: "8px 14px",
-                borderRadius: "8px",
-                border: "1px solid #1f2937",
-                backgroundColor: "#111827",
-                color: "#f9fafb",
-                fontSize: "12px",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Save
-            </button>
-            {selectedExampleId?.startsWith(CUSTOM_LOCAL_PREFIX) && (
-              <button
-                onClick={deleteLocalExample}
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: "8px",
-                  border: "1px solid #dc2626",
-                  backgroundColor: "#fee2e2",
-                  color: "#991b1b",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Delete
-              </button>
-            )}
-            {/* <button
-              onClick={createBlankExample}
-              style={{
-                padding: "8px 14px",
-                borderRadius: "8px",
-                border: "1px solid #4b5563",
-                backgroundColor: "#f9fafb",
-                color: "#1f2937",
-                fontSize: "12px",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              New Code
-            </button> */}
-            {shareStatus && (
-              <span
-                style={{
-                  fontSize: "11px",
-                  color: shareStatus.includes("Unable") ? "#fecaca" : "#bbf7d0",
-                }}
-              >
-                {shareStatus}
-              </span>
-            )}
-          </div>
-        ) : (
-          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-            <select
-              value={selectedExampleId ?? ""}
-              onChange={(event) => loadExample(event.target.value)}
-              disabled={disabled || isExecutingAction}
-              style={{
-                padding: "6px 10px",
-                borderRadius: "6px",
-                border: "1px solid #d1d5db",
-                backgroundColor: "#ffffff",
-                fontSize: "12px",
-                minWidth: "220px",
-              }}
-            >
-              <option value={BLANK_EXAMPLE_ID}>New Blank Action</option>
-              {hasSharedLink && (
-                <option value={CUSTOM_SHARE_EXAMPLE_ID}>Shared Code</option>
-              )}
-              {localExamples.map((example) => (
-                <option key={example.id} value={example.id}>
-                  {example.title} (Local)
-                </option>
-              ))}
-              {litActionExamples.map((example) => (
-                <option key={example.id} value={example.id}>
-                  {example.title}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={handleShare}
-              style={{
-                padding: "8px 14px",
-                borderRadius: "8px",
-                border: "1px solid #d1d5db",
-                backgroundColor: "#f3f4f6",
-                color: "#1f2937",
-                fontSize: "12px",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Share Link
-            </button>
-            {shareStatus && (
-              <span
-                style={{
-                  fontSize: "11px",
-                  color: shareStatus.includes("Unable") ? "#dc2626" : "#15803d",
-                }}
-              >
-                {shareStatus}
-              </span>
-            )}
-          </div>
-        )}
+        {renderActionToolbar(isFullscreen)}
       </div>
 
       <p
@@ -1485,6 +1919,7 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
           {renderCompactLayout()}
 
           <button
+            id="lit-action-run-secondary"
             onClick={executeLitAction}
             disabled={executeButtonDisabled}
             className={`w-full p-3 rounded-lg text-sm font-medium flex items-center justify-center gap-2 border-1 border-gray-200 ${
@@ -1492,6 +1927,7 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
                 ? "bg-gray-400 cursor-not-allowed text-white"
                 : "bg-[#B7410D] text-white cursor-pointer"
             }`}
+            style={{ alignSelf: "flex-start", height: CTA_HEIGHT, padding: "0 20px" }}
           >
             {executeButtonContent}
           </button>
@@ -1525,12 +1961,12 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
         </>
       )}
 
-      {showParsedModal && parsedResponse && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            backgroundColor: "rgba(15,23,42,0.85)",
+        {showParsedModal && parsedResponse && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              backgroundColor: "rgba(15,23,42,0.85)",
             backdropFilter: "blur(4px)",
             zIndex: FULLSCREEN_Z_INDEX + 5,
             display: "flex",
@@ -1619,9 +2055,31 @@ export const LitActionForm: React.FC<LitActionFormProps> = ({
             >
               {renderParsedEntries(parsedResponse, true)}
             </div>
+            </div>
           </div>
+        )}
+      </div>
+      {shareStatus && (
+        <div
+          style={{
+            position: "fixed",
+            right: 24,
+            bottom: 24,
+            padding: "10px 16px",
+            borderRadius: "10px",
+            border: `1px solid ${shareStatusPalette.borderColor}`,
+            backgroundColor: shareStatusPalette.backgroundColor,
+            color: shareStatusPalette.color,
+            fontSize: "12px",
+            boxShadow: "0 20px 45px rgba(15,23,42,0.25)",
+            zIndex: FULLSCREEN_Z_INDEX + 20,
+            maxWidth: "260px",
+            lineHeight: 1.5,
+          }}
+        >
+          {shareStatus}
         </div>
       )}
-    </div>
+    </>
   );
 };
