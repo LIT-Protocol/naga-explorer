@@ -16,6 +16,7 @@
     "@lit-protocol/access-control-conditions": "8.0.1",
     "@lit-protocol/auth": "8.0.1",
     "@lit-protocol/lit-client": "8.0.1",
+    "@lit-protocol/naga-la-types": "^0.1.0",
     "@lit-protocol/networks": "8.0.1",
     "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
