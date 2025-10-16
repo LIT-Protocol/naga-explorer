@@ -5,6 +5,7 @@ import React, {
   createContext,
   ReactNode,
   useContext,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -83,6 +84,14 @@ interface LitAuthContextValue {
   setAuthServiceBaseUrl: (url: string) => void;
   loginServiceBaseUrl: string;
   setLoginServiceBaseUrl: (url: string) => void;
+  forceNetworkSelection: (
+    networkName: SupportedNetworkName
+  ) => Promise<void>;
+  autoLoginWithDefaultKey: (options?: {
+    forceNetwork?: SupportedNetworkName;
+  }) => Promise<boolean>;
+  isAutoLoggingIn: boolean;
+  autoLoginStatus: string | null;
 }
 
 const LitAuthContext = createContext<LitAuthContextValue | null>(null);
@@ -429,6 +438,38 @@ export const LitAuthProvider: React.FC<LitAuthProviderProps> = ({
   const [tempMethod, setTempMethod] = useState<AuthMethod | null>(null);
   const [showPkpSelection, setShowPkpSelection] = useState(false);
   const [isWebAuthnExistingFlow, setIsWebAuthnExistingFlow] = useState(false);
+  const [isAutoLoggingIn, setIsAutoLoggingIn] = useState(false);
+  const [autoLoginStatus, setAutoLoginStatus] = useState<string | null>(null);
+  const autoLoginInProgressRef = useRef(false);
+  const pendingNetworkChangeRef = useRef<{
+    target: SupportedNetworkName;
+    resolve: () => void;
+  } | null>(null);
+  const servicesRef = useRef<LitServices | null>(services);
+  const setupServicesRef = useRef<typeof setupServices>();
+  const isServicesReadyRef = useRef<boolean>(isServicesReady);
+
+  useEffect(() => {
+    servicesRef.current = services;
+  }, [services]);
+
+  useEffect(() => {
+    setupServicesRef.current = setupServices;
+  }, [setupServices]);
+
+  useEffect(() => {
+    isServicesReadyRef.current = isServicesReady;
+  }, [isServicesReady]);
+
+  useEffect(() => {
+    if (
+      pendingNetworkChangeRef.current &&
+      localNetworkName === pendingNetworkChangeRef.current.target
+    ) {
+      pendingNetworkChangeRef.current.resolve();
+      pendingNetworkChangeRef.current = null;
+    }
+  }, [localNetworkName]);
 
   // Authentication methods configuration
   const authMethods: AuthMethodInfo[] = [
@@ -837,6 +878,208 @@ export const LitAuthProvider: React.FC<LitAuthProviderProps> = ({
       setIsAuthenticating(false);
     }
   };
+
+  const waitForServicesReady = useCallback(async (): Promise<LitServices> => {
+    if (
+      servicesRef.current?.litClient &&
+      servicesRef.current?.authManager &&
+      isServicesReadyRef.current
+    ) {
+      return servicesRef.current;
+    }
+
+    if (setupServicesRef.current) {
+      try {
+        const newServices = await setupServicesRef.current();
+        if (newServices) {
+          servicesRef.current = newServices;
+          return newServices;
+        }
+      } catch (error: any) {
+        const message =
+          typeof error?.message === "string" ? error.message : String(error);
+        if (!message.includes("Services are already being initialized")) {
+          throw error;
+        }
+      }
+    }
+
+    return await new Promise<LitServices>((resolve, reject) => {
+      const start = Date.now();
+      const timeoutMs = 15_000;
+      const interval = setInterval(() => {
+        if (
+          servicesRef.current?.litClient &&
+          servicesRef.current?.authManager &&
+          isServicesReadyRef.current
+        ) {
+          clearInterval(interval);
+          resolve(servicesRef.current);
+        } else if (Date.now() - start > timeoutMs) {
+          clearInterval(interval);
+          reject(
+            new Error("Timed out waiting for Lit services to become ready")
+          );
+        }
+      }, 100);
+    });
+  }, []);
+
+  const forceNetworkSelection = useCallback(
+    async (network: SupportedNetworkName) => {
+      if (localNetworkName !== network) {
+        const moduleCandidate =
+          NETWORK_MODULES[network] ||
+          (network === "naga" ? networkModule : undefined) ||
+          nagaDev;
+        const waitForNetwork = new Promise<void>((resolve) => {
+          pendingNetworkChangeRef.current = {
+            target: network,
+            resolve,
+          };
+        });
+
+        setLocalNetwork(moduleCandidate);
+        setLocalNetworkName(network);
+        await waitForNetwork;
+        clearServices();
+      }
+
+      await waitForServicesReady();
+    },
+    [localNetworkName, networkModule, waitForServicesReady, clearServices]
+  );
+
+  const autoLoginWithDefaultKey = useCallback(
+    async (options?: {
+      forceNetwork?: SupportedNetworkName;
+    }): Promise<boolean> => {
+      if (autoLoginInProgressRef.current) {
+        return isUserAuthenticated;
+      }
+
+      if (isUserAuthenticated) {
+        setAutoLoginStatus(null);
+        if (
+          options?.forceNetwork &&
+          localNetworkName !== options.forceNetwork
+        ) {
+          await forceNetworkSelection(options.forceNetwork);
+        }
+        return true;
+      }
+
+      autoLoginInProgressRef.current = true;
+      setIsAutoLoggingIn(true);
+      setIsAuthenticating(true);
+      setError(null);
+      setAutoLoginStatus("Preparing automatic login…");
+
+      try {
+        const targetNetwork = options?.forceNetwork ?? "naga-dev";
+        setAutoLoginStatus(`Switching to ${targetNetwork} network…`);
+        await forceNetworkSelection(targetNetwork);
+        setAutoLoginStatus("Initialising Lit services…");
+        const activeServices = await waitForServicesReady();
+
+        const account = privateKeyToAccount(
+          DEFAULT_PRIVATE_KEY as `0x${string}`
+        );
+        setAutoLoginStatus("Authenticating with development wallet…");
+        const { ViemAccountAuthenticator } = await import(
+          "@lit-protocol/auth"
+        );
+        const authData = await ViemAccountAuthenticator.authenticate(account);
+
+        setAutoLoginStatus("Fetching PKPs for development wallet…");
+        const pkpResult = await activeServices.litClient.viewPKPsByAuthData({
+          authData: {
+            authMethodType: authData.authMethodType,
+            authMethodId: authData.authMethodId,
+          },
+          pagination: {
+            limit: 1,
+            offset: 0,
+          },
+        });
+
+        const firstPkp = pkpResult?.pkps?.[0];
+        if (!firstPkp) {
+          setAutoLoginStatus(
+            "No PKPs found for the development wallet. Please mint one."
+          );
+          setError(
+            "No PKPs found for the default development private key. Please mint one first."
+          );
+          return false;
+        }
+
+        const pkpInfo: PKPData = {
+          tokenId: firstPkp.tokenId,
+          pubkey: firstPkp.pubkey || firstPkp.publicKey || "",
+          ethAddress: firstPkp.ethAddress || "",
+        };
+
+        if (!pkpInfo.pubkey) {
+          setAutoLoginStatus("Unable to locate PKP for development wallet.");
+          throw new Error(
+            "Unable to locate a public key for the default PKP during automatic login."
+          );
+        }
+
+        setAutoLoginStatus("Creating Lit session for your PKP…");
+        const authContext =
+          await activeServices.authManager.createPkpAuthContext({
+            authData,
+            pkpPublicKey: pkpInfo.pubkey,
+            authConfig: {
+              expiration: new Date(
+                Date.now() + 1000 * 60 * 60 * 24
+              ).toISOString(),
+              statement: "",
+              domain: "",
+              resources: [
+                ["pkp-signing", "*"],
+                ["lit-action-execution", "*"],
+                ["access-control-condition-decryption", "*"],
+              ],
+            },
+            litClient: activeServices.litClient,
+          });
+
+        const userData: AuthUser = {
+          authContext,
+          pkpInfo,
+          method: "eoa",
+          timestamp: Date.now(),
+          authData,
+        };
+
+        saveUser(userData);
+        setAccountMethod("privateKey");
+        setAutoLoginStatus("Automatic login complete. Loading playground…");
+        setTimeout(() => setAutoLoginStatus(null), 1500);
+        return true;
+      } catch (error) {
+        console.error("Automatic share link login failed:", error);
+        handleError(error, "Automatic share link login failed");
+        setAutoLoginStatus("Automatic login failed. Opening sign-in modal…");
+        return false;
+      } finally {
+        setIsAuthenticating(false);
+        setIsAutoLoggingIn(false);
+        autoLoginInProgressRef.current = false;
+      }
+    },
+    [
+      saveUser,
+      forceNetworkSelection,
+      waitForServicesReady,
+      isUserAuthenticated,
+      localNetworkName,
+      handleError,
+    ]
+  );
 
   // New flow: Mint then await manual funding before creating auth context
   const mintThenAwaitFunding = async (authData: any, method: AuthMethod) => {
@@ -1349,6 +1592,10 @@ export const LitAuthProvider: React.FC<LitAuthProviderProps> = ({
     setAuthServiceBaseUrl,
     loginServiceBaseUrl,
     setLoginServiceBaseUrl,
+    forceNetworkSelection,
+    autoLoginWithDefaultKey,
+    isAutoLoggingIn,
+    autoLoginStatus,
   };
 
   // Always render children with context

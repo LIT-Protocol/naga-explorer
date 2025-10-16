@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useLitAuth } from "../lit-login-modal/LitAuthProvider";
 import {
   PKPPermissionsProvider,
@@ -45,14 +45,32 @@ export default function LoggedInDashboard() {
     authServiceBaseUrl,
     currentNetworkName,
     shouldDisplayNetworkMessage,
+    autoLoginWithDefaultKey,
+    isAutoLoggingIn,
+    forceNetworkSelection,
+    autoLoginStatus,
   } = useLitAuth();
 
   const hasAutoStartedRef = useRef(false);
+  const shareAutoLoginTriggeredRef = useRef(false);
   const hasInitialBalanceRefetch = useRef(false);
   const blockWatcherCleanupRef = useRef<null | (() => void)>(null);
   const lastBalanceUpdateAtRef = useRef<number>(0);
 
+  const navigate = useNavigate();
+  const location = useLocation();
+  const hasSharedCode = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.has("code") || params.has("params");
+  }, [location.search]);
+  const autoLoginRequested = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const flag = params.get("autoLogin");
+    return flag === "1" || flag === "true";
+  }, [location.search]);
+
   useEffect(() => {
+    if (autoLoginRequested) return;
     if (
       LOGIN_METHOD === LOGIN_STYLE.popup &&
       !user &&
@@ -61,7 +79,45 @@ export default function LoggedInDashboard() {
       hasAutoStartedRef.current = true;
       initiateAuthentication();
     }
-  }, [user, initiateAuthentication]);
+  }, [user, initiateAuthentication, autoLoginRequested]);
+
+  useEffect(() => {
+    if (!autoLoginRequested) return;
+    if (user) return;
+    if (shareAutoLoginTriggeredRef.current) return;
+
+    shareAutoLoginTriggeredRef.current = true;
+
+    autoLoginWithDefaultKey({ forceNetwork: "naga-dev" })
+      .then((success) => {
+        if (!success) {
+          initiateAuthentication();
+        }
+      })
+      .catch(() => {
+        initiateAuthentication();
+      });
+  }, [
+    autoLoginRequested,
+    user,
+    autoLoginWithDefaultKey,
+    initiateAuthentication,
+  ]);
+
+  useEffect(() => {
+    if (!autoLoginRequested) return;
+    if (!user) return;
+    if (currentNetworkName === "naga-dev") return;
+
+    forceNetworkSelection("naga-dev").catch((error) => {
+      console.error("Failed to switch network for share link:", error);
+    });
+  }, [
+    autoLoginRequested,
+    user,
+    currentNetworkName,
+    forceNetworkSelection,
+  ]);
 
   // Core state
   const [showPkpModal, setShowPkpModal] = useState(false);
@@ -86,8 +142,6 @@ export default function LoggedInDashboard() {
   ];
 
   // URL-driven tab state
-  const navigate = useNavigate();
-  const location = useLocation();
   const pathToTab: Record<string, string> = {
     "/playground": "playground",
     "/pkp-permissions": "permissions",
@@ -299,6 +353,21 @@ export default function LoggedInDashboard() {
 
   // Authentication and loading states
   if (!user) {
+    if (autoLoginRequested) {
+      return (
+        <div className="p-5 text-center">
+          <div className="inline-block w-10 h-10 border-4 border-gray-200 border-t-[#007bff] rounded-full animate-spin mb-5" />
+          <h2 className="text-[#333] mb-2">Loading shared playground…</h2>
+          <p className="text-gray-600">
+            {autoLoginStatus ||
+              (isAutoLoggingIn
+                ? "Automatically signing you in with the development wallet…"
+                : "Preparing your session…")}
+          </p>
+        </div>
+      );
+    }
+
     if (LOGIN_METHOD === LOGIN_STYLE.popup) {
       return (
         <div className="p-5 text-center">
