@@ -148,8 +148,10 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
       "@layout": path.resolve(__dirname, "./src/layout"),
-    //   buffer: "buffer",
+      // buffer: "buffer/",
     },
   },
-//   optimizeDeps: { include: ["buffer"] },
+  // optimizeDeps: {
+  //   include: ["buffer"],
+  // },
 });

@@ -2,6 +2,13 @@
 
 Lit Explorer Naga is an application that allows you to authenticate with Lit Protocol using the native Lit auth methods.
 
+## Development
+
+- Install dependencies with `pnpm install`.
+- Start the dev server with `pnpm dev`.
+- Build for production with `pnpm build`.
+- Preview the production build locally with `pnpm preview`.
+
 ## Adding Lit Action examples
 
 - Add a new file in `src/lit-action-examples/entries/` that default-exports a `LitActionExample`. The `id` must be unique.

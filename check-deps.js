@@ -137,7 +137,7 @@ if (missingDeps.length > 0) {
     'siwe-recap': '^0.0.2-alpha.0',
     'jose': '^4.14.4',
     'ethers': '5.7.2',
-    'viem': '^2.29.4',
+    'viem': "^2.38.2",
     '@noble/curves': '^1.2.0',
     '@noble/hashes': '^1.3.0',
     'base64url': '^3.0.1',
@@ -156,7 +156,7 @@ if (missingDeps.length > 0) {
   });
   
   console.log('\n💡 Or run this command to install them all:');
-  const installCmd = `bun add ${missingDeps.map(dep => `${dep}@${versionMap[dep] || 'latest'}`).join(' ')}`;
+  const installCmd = `pnpm add ${missingDeps.map(dep => `${dep}@${versionMap[dep] || 'latest'}`).join(' ')}`;
   console.log(`\n${installCmd}\n`);
   
 } else {
