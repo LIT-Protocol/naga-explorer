@@ -14,10 +14,10 @@
   },
   "dependencies": {
     "@lit-protocol/access-control-conditions": "8.0.2",
-    "@lit-protocol/auth": "0.0.0-20251016165432",
-    "@lit-protocol/lit-client": "0.0.0-20251016165432",
+    "@lit-protocol/auth": "8.1.0",
+    "@lit-protocol/lit-client": "8.1.0",
     "@lit-protocol/naga-la-types": "^0.1.0",
-    "@lit-protocol/networks": "0.0.0-20251016165432",
+    "@lit-protocol/networks": "8.1.0",
     "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-hover-card": "^1.1.15",
