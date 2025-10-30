@@ -1,4 +1,3 @@
-import { DiscordAuthenticator, GoogleAuthenticator } from "@lit-protocol/auth";
 import { Settings } from "lucide-react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import React, {
@@ -27,7 +26,17 @@ import PKPSelectionSection from "./PKPSelectionSection";
 import { APP_INFO } from "../_config";
 import { PaymentManagementDashboard } from "../lit-logged-page/protectedApp/components/PaymentManagement/PaymentManagementDashboard";
 import { nagaDev, nagaTest } from "@lit-protocol/networks";
-import { PKPData } from "@lit-protocol/schemas";
+import type { PKPData } from "@lit-protocol/schemas";
+
+type LitAuthModule = typeof import("@lit-protocol/auth");
+
+let litAuthModulePromise: Promise<LitAuthModule> | null = null;
+const loadLitAuthModule = () => {
+  if (!litAuthModulePromise) {
+    litAuthModulePromise = import("@lit-protocol/auth");
+  }
+  return litAuthModulePromise;
+};
 
 type SupportedNetworkName = "naga" | "naga-dev" | "naga-test";
 const NETWORK_MODULES: Partial<Record<SupportedNetworkName, any>> = {
@@ -987,9 +996,7 @@ export const LitAuthProvider: React.FC<LitAuthProviderProps> = ({
           DEFAULT_PRIVATE_KEY as `0x${string}`
         );
         setAutoLoginStatus("Authenticating with development wallet…");
-        const { ViemAccountAuthenticator } = await import(
-          "@lit-protocol/auth"
-        );
+        const { ViemAccountAuthenticator } = await loadLitAuthModule();
         const authData = await ViemAccountAuthenticator.authenticate(account);
 
         setAutoLoginStatus("Fetching PKPs for development wallet…");
@@ -1112,6 +1119,7 @@ export const LitAuthProvider: React.FC<LitAuthProviderProps> = ({
       setIsAuthenticating(true);
       setError(null);
 
+      const { GoogleAuthenticator } = await loadLitAuthModule();
       const authData = await GoogleAuthenticator.authenticate(
         loginServiceBaseUrl
       );
@@ -1136,6 +1144,7 @@ export const LitAuthProvider: React.FC<LitAuthProviderProps> = ({
       console.log("loginServiceBaseUrl", loginServiceBaseUrl);
       console.log("discordClientId", discordClientId);
 
+      const { DiscordAuthenticator } = await loadLitAuthModule();
       const authData = await DiscordAuthenticator.authenticate(
         loginServiceBaseUrl,
         {
@@ -1171,7 +1180,7 @@ export const LitAuthProvider: React.FC<LitAuthProviderProps> = ({
         }
         account = privateKeyToAccount(privateKey as `0x${string}`);
 
-        const { ViemAccountAuthenticator } = await import("@lit-protocol/auth");
+        const { ViemAccountAuthenticator } = await loadLitAuthModule();
         authData = await ViemAccountAuthenticator.authenticate(account);
       } else {
         if (!walletClient?.account) {
@@ -1179,9 +1188,7 @@ export const LitAuthProvider: React.FC<LitAuthProviderProps> = ({
         }
         account = walletClient;
 
-        const { WalletClientAuthenticator } = await import(
-          "@lit-protocol/auth"
-        );
+        const { WalletClientAuthenticator } = await loadLitAuthModule();
         authData = await WalletClientAuthenticator.authenticate(walletClient);
       }
 
@@ -1231,7 +1238,7 @@ export const LitAuthProvider: React.FC<LitAuthProviderProps> = ({
         console.log("[authenticateWebAuthn] litClient chainConfig:", chainCfg);
       } catch {}
 
-      const { WebAuthnAuthenticator } = await import("@lit-protocol/auth");
+      const { WebAuthnAuthenticator } = await loadLitAuthModule();
 
       if (webAuthnMode === "register" || modalMode === "signup") {
         // Register new credential and mint PKP

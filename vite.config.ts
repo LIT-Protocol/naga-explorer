@@ -171,6 +171,18 @@ export default defineConfig({
             if (id.includes("@walletconnect") || id.includes("@reown")) {
               return "walletconnect";
             }
+            if (id.includes("@lit-protocol/wasm")) {
+              return "lit-wasm";
+            }
+            if (id.includes("@lit-protocol/auth")) {
+              return "lit-auth";
+            }
+            if (id.includes("@lit-protocol/lit-client")) {
+              return "lit-client";
+            }
+            if (id.includes("@lit-protocol/networks")) {
+              return "lit-networks";
+            }
             if (id.includes("@lit-protocol")) {
               return "lit-protocol";
             }
