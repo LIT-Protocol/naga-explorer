@@ -148,18 +148,18 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
       "@layout": path.resolve(__dirname, "./src/layout"),
-      // Prevent Lit SDK from bundling the Node-only implementation of node-localstorage
-      "node-localstorage": path.resolve(
-        __dirname,
-        "./src/shims/node-localstorage.ts"
-      ),
-      // Ensure every dependency resolves to the same viem build
-      viem: path.resolve(__dirname, "./node_modules/viem"),
-      // Strip Node-focused helpers from client bundle
-      "source-map-support": path.resolve(
-        __dirname,
-        "./src/shims/source-map-support"
-      ),
+      // // Prevent Lit SDK from bundling the Node-only implementation of node-localstorage
+      // "node-localstorage": path.resolve(
+      //   __dirname,
+      //   "./src/shims/node-localstorage.ts"
+      // ),
+      // // Ensure every dependency resolves to the same viem build
+      // viem: path.resolve(__dirname, "./node_modules/viem"),
+      // // Strip Node-focused helpers from client bundle
+      // "source-map-support": path.resolve(
+      //   __dirname,
+      //   "./src/shims/source-map-support"
+      // ),
     //   buffer: "buffer",
     },
   },
@@ -171,9 +171,9 @@ export default defineConfig({
             if (id.includes("@walletconnect") || id.includes("@reown")) {
               return "walletconnect";
             }
-            if (id.includes("@lit-protocol")) {
-              return "lit-protocol";
-            }
+            // if (id.includes("@lit-protocol")) {
+            //   return "lit-protocol";
+            // }
           }
           return undefined;
         },
