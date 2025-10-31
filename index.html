@@ -36,6 +36,16 @@
       content="https://naga-explorer.getlit.dev/"
     />
 
+    <script>
+      try {
+        if (window.top !== window.self) {
+          window.top.location = window.self.location;
+        }
+      } catch (frameError) {
+        window.self.location = "about:blank";
+      }
+    </script>
+
     <script defer data-domain="naga-explorer.getlit.dev" src="https://plausible.io/js/script.js"></script>
   </head>
   <body>

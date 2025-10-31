@@ -14,11 +14,11 @@
     "update:lit": "packages=$(bun outdated | sed 's/\\x1b\\[[0-9;]*m//g' | grep '@lit-protocol' | awk -F '│' '{gsub(/^[ \\t]+|[ \\t]+$/, \"\", $2); print $2}'); [ -z \"$packages\" ] && echo '✅ Nothing to update.' || (echo \"$packages\" | sed 's/^/ - /'; bun add --no-cache $packages)"
   },
   "dependencies": {
-    "@lit-protocol/access-control-conditions": "8.0.1",
-    "@lit-protocol/auth": "8.1.1",
-    "@lit-protocol/lit-client": "8.2.2",
+    "@lit-protocol/access-control-conditions": "0.0.0-20251031163033",
+    "@lit-protocol/auth": "0.0.0-20251031163033",
+    "@lit-protocol/lit-client": "0.0.0-20251031163033",
     "@lit-protocol/naga-la-types": "^0.1.0",
-    "@lit-protocol/networks": "8.2.2",
+    "@lit-protocol/networks": "0.0.0-20251031163033",
     "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-hover-card": "^1.1.15",
@@ -37,7 +37,7 @@
     "react-router-dom": "^7.6.0",
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^4.1.12",
-    "viem": "2.29.4",
+    "viem": "2.38.x",
     "wagmi": "^2.14.11",
     "zod": "^3.24.2"
   },
