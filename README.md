@@ -2,6 +2,19 @@
 
 Lit Explorer Naga is an application that allows you to authenticate with Lit Protocol using the native Lit auth methods.
 
+# Env vars
+
+```bash
+# Global Settings
+VITE_LOGIN_SERVICE_URL=https://login.litgateway.com
+VITE_LOGIN_DISCORD_CLIENT_ID=1052874239658692668
+
+# Network-Specific Auth Service URLs
+VITE_AUTH_SERVICE_URL_NAGA_DEV=https://naga-dev-auth-service.getlit.dev
+VITE_AUTH_SERVICE_URL_NAGA_TEST=https://naga-test-auth-service.getlit.dev
+VITE_AUTH_SERVICE_URL_NAGA=https://naga-auth-service.getlit.dev
+```
+
 ## Adding Lit Action examples
 
 - Add a new file in `src/lit-action-examples/entries/` that default-exports a `LitActionExample`. The `id` must be unique.
