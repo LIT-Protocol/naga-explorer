@@ -15,6 +15,12 @@ VITE_AUTH_SERVICE_URL_NAGA_TEST=https://naga-test-auth-service.getlit.dev
 VITE_AUTH_SERVICE_URL_NAGA=https://naga-auth-service.getlit.dev
 ```
 
+## Getting started
+
+```
+bun install && bun dev
+```
+
 ## Adding Lit Action examples
 
 - Add a new file in `src/lit-action-examples/entries/` that default-exports a `LitActionExample`. The `id` must be unique.
